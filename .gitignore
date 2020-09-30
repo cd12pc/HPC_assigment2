@@ -1,0 +1,11 @@
+bin/*
+asm/*
+asm_o/*
+obj/*
+obj_o/*
+lib/Celero
+lib/Celero/*
+lib/CeleroBuild
+lib/CeleroBuild/*
+results
+results/*
