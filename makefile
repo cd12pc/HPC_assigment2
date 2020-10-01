@@ -1,6 +1,9 @@
 .SECONDEXPANSION:
-.PHONY: _base
+.PHONY: _base 
 _base: base
+
+
+
 
 
 #Compiler command
@@ -49,8 +52,21 @@ CFLAGS :=-I$(IDIR)
 # CPP Specific Flags
 CPPFLAGS := $(CFLAGS)  
 
+#DEBUGGNING FLAGS (Turned off by default)
+.PHONY: _debug
+_debug:
+	@echo "!!!!!!! Building for debugging !!!!!!!!!!!"
+	$(eval DEBUG_FLAGS = -g)
+
+# PROFILING FLAGS (Turned off by defualt)
+.PHONY: _prof
+_prof:
+	@echo "!!!!!!! Building for profiling !!!!!!!!!!!"
+	$(eval PERF_FLAGS = -g -pg)
+
+
 # Normal Optimiztion Flags
-OPTFLAGS := -g
+OPTFLAGS :=
 
 # Linker Flags
 LDFLAGS :=
@@ -76,6 +92,7 @@ EXE := run
 # Objects to build
 _OBJS := f/t.o hg.o
 OBJS := $(patsubst %.o,$(ODIR)/%.o,$(_OBJS))
+
 
 # Main file to build
 _MAIN := main.o
@@ -104,29 +121,30 @@ BENCH_DEPS += $(CELEDIR_B)/libcelero.so
 $(CELEDIR)/CMakeLists.txt:
 	@echo "---- Cloning Celero"
 	@mkdir -p $(LDIR)
-	rm -rf $(CELEDIR)
-	git clone --depth=1  https://github.com/DigitalInBlue/Celero.git ./$(CELEDIR)
+	@rm -rf $(CELEDIR)
+	@git clone --depth=1  https://github.com/DigitalInBlue/Celero.git ./$(CELEDIR)
 
 $(CELEDIR_B)/libcelero.so: $(CELEDIR)/CMakeLists.txt
 	@echo "========================================================="
 	@echo "==================== BUILDING CELERO ===================="
 	@echo "========================================================="
-	cmake -S $(CELEDIR) -B $(CELEDIR_B)
-	$(MAKE) -C $(CELEDIR_B)
+	@cmake -S $(CELEDIR) -B $(CELEDIR_B)
+	@$(MAKE) -C $(CELEDIR_B)
 	@echo "========================================================="
 	@echo "==================== DONE CELERO ===================="
 	@echo "========================================================="
 
 .PHONY: clean-celero
 clean-celero:
-	rm -rf $(CELEDIR) $(CELEDIR_B)
+	@echo "---- Cleaning Celero"
+	@rm -rf $(CELEDIR) $(CELEDIR_B)
 
 ################################################
 ######### Collect flags for readability ########
 ################################################
-B_FLAGS := $(CPPFLAGS) $(BENCH_FLAGS) $(LDFLAGS) $(BENCH_LDFLAGS)
+B_FLAGS = $(CPPFLAGS) $(DEBUG_FLAGS) $(PERF_FLAGS) $(BENCH_FLAGS) $(LDFLAGS) $(BENCH_LDFLAGS)
 B_LIBS := $(LIBS) $(BENCH_LIBS)
-FLAGS := $(CFLAGS)
+FLAGS = $(CFLAGS) $(DEBUG_FLAGS) $(PROF_FLAGS)
 
 ##################################################################################################
 ########################## FOLDER RULES ##########################################################
@@ -187,33 +205,33 @@ $(RDIR)/.:
 # Assembly files
 $(ADIR)/%.s: $(SDIR)/%.c $(DEPS) | $$(@D)/.
 	@echo "---- Assembling: $@"
-	@$(CC) $(OPTFLAGS) $(FLAGS) -fverbose-asm -g -S -o $@ $< $(LIBS)
+	@$(strip $(CC) $(OPTFLAGS) $(FLAGS) -fverbose-asm -g -S -o $@ $< $(LIBS))
 
 $(ADIR)/%.s: $(SDIR)/%.cpp $(DEPS) $(BENCH_DEPS) | $$(@D)/.
 	@echo "---- Assembling: $@"
-	@$(CC) $(OPTFLAGS) $(B_FLAGS) -S -o $@ $< $(B_LIBS)
+	@$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -S -o $@ $< $(B_LIBS))
 
 ## Building Objects
 $(ODIR)/%.o: $(SDIR)/%.c $(DEPS) | $$(@D)/.
 	@echo "---- Building $@"
-	@$(CC) $(OPTFLAGS) $(CFLAGS) -c -o $@ $<
+	@$(strip $(CC) $(OPTFLAGS) $(FLAGS) -c -o $@ $<)
 
 $(ODIR)/%.o: $(SDIR)/%.cpp $(DEPS) $(BENCH_DEPS) | $$(@D)/.
 	@echo "---- Building $@"
-	@$(CC) $(OPTFLAGS) $(B_FLAGS) -c -o $@ $<
+	@$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -c -o $@ $<)
 
 ## Linking main
 $(BDIR)/$(EXE).a: $(OBJS) $(MAIN) | $(RDIR)/. $$(@D)/.
 	@echo "++ Linking $@"
-	@$(CC) $(OPTFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(MAIN) $(LIBS)
+	@$(strip $(CC) $(OPTFLAGS) $(FLAGS) $(LDFLAGS) -o $@ $(OBJS) $(MAIN) $(LIBS))
 
 $(BDIR)/B_$(EXE).a: $(OBJS) $(B_MAIN) | $(RDIR)/. $$(@D)/.
 	@echo "++ Linking $@ $(*F) "
-	@$(CC) $(OPTFLAGS) $(CPPFLAGS) $(B_FLAGS) -o $@ $^ $(B_LIBS)
+	@$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -o $@ $^ $(B_LIBS))
 
 
 .PHONY: _start _basic _end
-base: _start $(BDIR)/B_$(EXE).a $(BDIR)/$(EXE).a $(A_FILES) _end
+_basic: _start $(BDIR)/B_$(EXE).a $(BDIR)/$(EXE).a $(A_FILES) _end
 
 _start:
 	@echo "========= Building Base ========="
@@ -246,35 +264,32 @@ _$(1)END:
 	@echo "========= Finsihed $(1) ========="
 	@echo ""
 
-$(OADIR)/$(1)/%.s: $(SDIR)/%.c $(DEPS) | $$(FOLDER)
+$(OADIR)/$(1)/%.s: $(SDIR)/%.c $$(DEPS) | $$(FOLDER)
 	@echo "---- Assembling: $$@"
-	@$(CC) $$($(1)FLAGS) $$(FLAGS) $$(ASM_FLAGS) -S -o $$@ $$< $$(LIBS)
+	@$$(strip $(CC) $$($(1)FLAGS) $$(FLAGS) $$(ASM_FLAGS) -S -o $$@ $$< $$(LIBS))
 
-$(OADIR)/$(1)/%.s: $(SDIR)/%.cpp $(DEPS) $(BENCH_DEPS) | $$(FOLDER)
+$(OADIR)/$(1)/%.s: $(SDIR)/%.cpp $$(DEPS) $(BENCH_DEPS) | $$(FOLDER)
 	@echo "---- Assembling: $$@ $$(@D)/."
-	@$(CC) $($(1)FLAGS) $(B_FLAGS) -S -o $$@ $$< $(B_LIBS)
+	@$$(strip $(CC) $($(1)FLAGS) $$(B_FLAGS) -S -o $$@ $$< $(B_LIBS))
 
 ## Building Objects
 $(OODIR)/$(1)/%.o: $$(SDIR)/%.c $$(DEPS) | $$(FOLDER)
 	@echo "---- Building $$@" 
-	@$(CC) $$($(1)FLAGS) $(CFLAGS) -c -o $$@ $$<
+	@$$(strip $(CC) $$($(1)FLAGS) $$(FLAGS) -c -o $$@ $$<)
 
 $(OODIR)/$(1)/%.o: $$(SDIR)/%.cpp $$(DEPS) $$(BENCH_DEPS)  | $$(FOLDER)
 	@echo "---- Building $$@"
-	@$(CC) $$($(1)FLAGS) $$(B_FLAGS) -c -o $$@ $$<
+	@$$(strip $(CC) $$($(1)FLAGS) $$(B_FLAGS) -c -o $$@ $$<)
 
 ## Linking bechmark
 $(BDIR)/$(1)/$(EXE).a: $$($(1)OBJS) $$($(1)MAIN) | $$(RDIR)/. $$(FOLDER).
 	@echo "++ Linking $$@ "
-	@$(CC) $$($(1)FLAGS) $$(CFLAGS) $$(LDFLAGS) -o $$@ $$^ $$(LIBS)
+	@$$(strip $(CC) $$($(1)FLAGS) $$(FLAGS) $$(LDFLAGS) -o $$@ $$^ $$(LIBS))
 
 $(BDIR)/$(1)/B_$(EXE).a: $$($(1)OBJS) $$($(1)B_MAIN) | $$(RDIR)/. $$(FOLDER)
 	@echo "++ Linking $$@"
-	@$(CC) $$($(1)FLAGS) $$(CPPFLAGS) $$(B_FLAGS) -o $$@ $$^ $(B_LIBS)
+	@$$(strip $(CC) $$($(1)FLAGS) $$(B_FLAGS) -o $$@ $$^ $(B_LIBS))
 
-_all_opt_bench += B$(1)
-_all_opt_run += $(1)
-_all_opt_asm += $(1)asm
 endef
 
 
@@ -297,30 +312,69 @@ $(eval $(call FLAG_SET,ogn,-Og -march=native))
 ######## general rules ########
 ###############################
 
+
 .PHONY: base project all benchmark
-base: _basic project
+base: _basic
 project: o0 o2 o2n
-all: base opt-all
+all: base oall
 
 .PHONY: opt-all oall on oNum
-opt-all: $(_all_opt_bench) $(_all_opt_run) $(_all_opt_asm)
 oall: o0 o1 o2 o3 o0n o1n o2n o3n og ogn os osn
 oNum: o0 o1 o2 o3
-onNum: o0n o1n o2n o3n
+oNum-n: o0n o1n o2n o3n
 
+.PHONY: _touch_src _touch_src2
+_touch_src:
+	@echo "!!!!!!!!!!! touching $(SDIR)"
+	@touch $(SDIR)/*
 
+_touch_src2:
+	@echo "!!!!!!!!!!! touching $(SDIR)"
+	@touch $(SDIR)/*
+
+debug-base:    _debug _touch_src base    _touch_src2
+debug-project: _debug _touch_src project _touch_src2
+debug-all:     _debug _touch_src all     _touch_src2
+debug-oall:    _debug _touch_src oall    _touch_src2
+debug-oNum:    _debug _touch_src oNum    _touch_src2
+debug-oNum-n:  _debug _touch_src oNum-n  _touch_src2
+
+prof-base:    _prof _touch_src base    _touch_src2
+prof-project: _prof _touch_src project _touch_src2
+prof-all:     _prof _touch_src all     _touch_src2
+prof-oall:    _prof _touch_src oall    _touch_src2
+prof-oNum:    _prof _touch_src oNum    _touch_src2
+prof-oNum-n:  _prof _touch_src oNum-n  _touch_src2
 ###############################################
 ######## General clean-up Rules ###############
 ###############################################
 
-.PHONY: clean full-clean clean-results clean-celero clean-folders
+.PHONY: clean clean_obj clean_asm clean_bin clean-results clean-all
 clean:
-	rm -f $(ODIR)/*.o $(ODIR)/*/*.o $(OODIR)/*.o $(OODIR)/*/*.o $(BDIR)/*.a $(BDIR)/*/*.a $(ADIR)/*.s $(ADIR)/*/*.s
+	rm -f $(BDIR)/*.a $(BDIR)/*/*.a 
+clean_obj:
+	@echo "---- Cleaning Objects"
+	@rm -f $(ODIR)/*.o $(ODIR)/*/*.o
+	@echo "---- Cleaning Optimization Objects"
+	@rm -f $(OODIR)/*.o $(OODIR)/*/*.o 
+
+clean_asm:
+	@echo "---- Cleaning Assembler code"
+	@rm -f $(ADIR)/*.s $(ADIR)/*/*.s
+	@echo "---- Cleaning Optimization Assembler code"
+	@rm -f $(OADIR)/*.s $(OADIR)/*/*.s
+
+clean_bin:
+	@echo "---- Cleaning bin"
+	@rm -f $(BDIR)/*.a $(BDIR)/*/*.a 
 
 clean-results:
-	rm -fr $(RDIR)/*
+	@echo "---- Cleaning Results"
+	@rm -fr $(RDIR)/*
+	
 
 clean-folders:
-	rm -fr $(ADIR) $(OADIR) $(BDIR) $(ODIR) $(OODIR) $(RDIR)
+	@echo "---- Removing Folders"
+	@rm -fr $(ADIR) $(OADIR) $(BDIR) $(ODIR) $(OODIR) $(RDIR)
 
-full-clean: clean clean-results clean-folders clean-celero
+clean-all: clean clean-results clean-folders clean-celero
