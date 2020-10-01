@@ -1,0 +1,2 @@
+valgrind --tool=cachegrind ./run.a
+cg_annotate cachegrind.out.22222 main.c > main.c.annotated

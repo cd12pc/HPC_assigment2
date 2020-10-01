@@ -13,7 +13,6 @@ CC := gcc
 ### Directories #####
 #####################
 # Dynamic directories can be changed without issue static cannot
-
 # Source Directory (Static)
 SDIR :=./src
 # Include Directory (Static)
@@ -30,6 +29,10 @@ BDIR :=./bin
 ADIR :=./asm
 # Assmebelr Optimization output directory (Dynamic)
 OADIR :=./asm_o
+# Test source directory
+TS_DIR :=./src_t
+TB_DIR :=./bin_t
+TO_DIR :=./obj_t
 
 RDIR := ./results
 
@@ -101,6 +104,13 @@ B_MAIN := $(patsubst %.o,$(ODIR)/%.o,$(_B_MAIN))
 DB_MAIN := $(patsubst %.o,$(ODIR)/%.d.o,$(_B_MAIN))
 PB_MAIN := $(patsubst %.o,$(ODIR)/%.p.o,$(_B_MAIN))
 
+# Testing main to build
+_TEST_FILES := test.o
+
+T_R_FILES := $(patsubst %.o,$(TB_DIR)/%.a,$(_TEST_FILES))
+DT_R_FILES := $(patsubst %.o,$(TB_DIR)/%.d.a,$(_TEST_FILES))
+PT_R_FILES := $(patsubst %.o,$(TB_DIR)/%.p.a,$(_TEST_FILES))
+
 #Basic Assembler Files
 A_FILES := $(patsubst %.o,$(ADIR)/%.s,$(_OBJS))
 A_FILES += $(patsubst %.o,$(ADIR)/%.s,$(_B_MAIN))
@@ -138,13 +148,46 @@ clean-celero:
 	@echo "---- Cleaning Celero"
 	@rm -rf $(CELEDIR) $(CELEDIR_B)
 
+#################################################
+######### Build Unity for testing ##############
+################################################
+UNITYDIR := lib/unity
+UNITYDIR_B := lib/unityBuild
+
+TEST_FLAGS += -I./$(UNITYDIR)/src
+TEST_LIBS += -L$(UNITYDIR_B) -lunity
+TEST_LDFLAGS = -Wl,-rpath -Wl,$(UNITYDIR_B)
+TEST_DEPS += $(UNITYDIR_B)/libunity.a
+
+$(UNITYDIR)/CMakeLists.txt:
+	@echo "---- Cloning Unity"
+	@mkdir -p $(LDIR)
+	@rm -rf $(UNITYDIR)
+	@git clone --depth=1 https://github.com/ThrowTheSwitch/Unity.git ./$(UNITYDIR)
+
+$(UNITYDIR_B)/libunity.a: $(UNITYDIR)/CMakeLists.txt
+	@echo "========================================================="
+	@echo "==================== BUILDING UNITY ===================="
+	@echo "========================================================="
+	@cmake -S $(UNITYDIR) -B $(UNITYDIR_B)
+	@$(MAKE) -C $(UNITYDIR_B)
+	@echo "========================================================="
+	@echo "==================== DONE UNITY ===================="
+	@echo "========================================================="
+
+.PHONY: clean-unity
+clean-unity:
+	@echo "---- Cleaning Unity"
+	@rm -rf $(UNITYDIR) $(UNITYDIR_B)
 ################################################
 ######### Collect flags for readability ########
 ################################################
 B_FLAGS = $(CPPFLAGS) $(BENCH_FLAGS) $(LDFLAGS) $(BENCH_LDFLAGS)
-B_LIBS := $(LIBS) $(BENCH_LIBS)
 FLAGS = $(CFLAGS) $(LDFLAGS)
+T_FLAGS := $(CFLAGS) $(TEST_FLAGS) $(LDFLAGS) $(TEST_LDFLAGS)
 
+B_LIBS := $(LIBS) $(BENCH_LIBS)
+T_LIBS := $(LIBS) $(TEST_LIBS)
 ##################################################################################################
 ########################## FOLDER RULES ##########################################################
 ##################################################################################################
@@ -152,6 +195,7 @@ FLAGS = $(CFLAGS) $(LDFLAGS)
 .PRECIOUS: $(BDIR)/. $(BDIR)%/. $(ADIR)/. $(ADIR)%/. 
 .PRECIOUS: $(ODIR)/. $(ODIR)%/. $(OODIR)/. $(OODIR)%/.
 .PRECIOUS: $(OADIR)/. $(OADIR)%/. $(OADIR)/. $(OADIR)/.
+.PRECIOUS: $(TB_DIR)/. $(TB_DIR)%/. $(TO_DIR)/. $(TO_DIR)%/.
 
 $(ODIR)/.:
 	@echo "--== Creating $@"
@@ -193,6 +237,22 @@ $(OADIR)%/.:
 	@echo "--== Creating $@"
 	@mkdir -p $@
 
+$(TB_DIR)/.:
+	@echo "--== Creating $@"
+	@mkdir -p $@
+
+$(TB_DIR)%/.:
+	@echo "--== Creating $@"
+	@mkdir -p $@
+
+$(TO_DIR)/.:
+	@echo "--== Creating $@"
+	@mkdir -p $@
+
+$(TO_DIR)%/.:
+	@echo "--== Creating $@"
+	@mkdir -p $@
+
 $(RDIR)/.:
 	@echo "--== Creeating $@"
 	@mkdir -p $@
@@ -210,34 +270,35 @@ $(ADIR)/%.s: $(SDIR)/%.cpp $(DEPS) $(BENCH_DEPS) | $$(@D)/.
 	@echo "---- Assembling: $@"
 	@$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) $(ASM_FLAGS) -S -o $@ $< $(B_LIBS))
 
-## Building Objects
+## Building object files
 $(ODIR)/%.o: $(SDIR)/%.c $(DEPS) | $$(@D)/.
 	@echo "---- Building $@"
 	@$(strip $(CC) $(OPTFLAGS) $(FLAGS) -c -o $@ $<)
-
-$(ODIR)/%.o: $(SDIR)/%.cpp $(DEPS) $(BENCH_DEPS) | $$(@D)/.
-	@echo "---- Building $@"
-	@$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -c -o $@ $<)
 
 ## Linking main
 $(BDIR)/$(EXE).a: $(OBJS) $(MAIN) | $(RDIR)/. $$(@D)/.
 	@echo "++ Linking $@"
 	@$(strip $(CC) $(OPTFLAGS) $(FLAGS) -o $@ $(OBJS) $(MAIN) $(LIBS))
 
+## BENCHMARKING RULES
+$(ODIR)/%.o: $(SDIR)/%.cpp $(DEPS) $(BENCH_DEPS) | $$(@D)/.
+	@echo "---- Building $@"
+	@$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -c -o $@ $<)
+
 $(BDIR)/B_$(EXE).a: $(OBJS) $(B_MAIN) | $(RDIR)/. $$(@D)/.
-	@echo "++ Linking $@ $(*F) "
+	@echo "++ Linking $@"
 	@$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -o $@ $^ $(B_LIBS))
 
-
 .PHONY: _start _basic _end
-_basic: _start $(A_FILES) $(BDIR)/B_$(EXE).a $(BDIR)/$(EXE).a _end
-
+_basic: _start $(A_FILES) $(BDIR)/B_$(EXE).a $(BDIR)/$(EXE).a _t_basic _end
 _start:
 	@echo "========= Building Base ========="
 
 _end:
 	@echo "========= Finsihed Base ========="
 	@echo ""
+
+
 
 #############################################
 ##########  Build debugging files ###########
@@ -263,7 +324,7 @@ $(BDIR)/B_$(EXE).d.a: $(D_OBJS) $(DB_MAIN) | $(RDIR)/. $$(@D)/.
 
 
 .PHONY: _d_start _d_basic _d_end
-_d_basic: _d_start $(A_FILES) $(BDIR)/B_$(EXE).d.a $(BDIR)/$(EXE).d.a _d_end
+_d_basic: _d_start $(A_FILES) $(BDIR)/B_$(EXE).d.a $(BDIR)/$(EXE).d.a _dt_basic _d_end
 
 _d_start:
 	@echo "========= Building Debug Base ========="
@@ -296,7 +357,7 @@ $(BDIR)/B_$(EXE).p.a: $(P_OBJS) $(PB_MAIN) | $(RDIR)/. $$(@D)/.
 
 
 .PHONY: _p_start _p_basic _p_end
-_p_basic: _p_start $(A_FILES) $(BDIR)/B_$(EXE).p.a $(BDIR)/$(EXE).p.a _p_end
+_p_basic: _p_start $(A_FILES) $(BDIR)/B_$(EXE).p.a $(BDIR)/$(EXE).p.a _pt_basic _p_end
 
 _p_start:
 	@echo "========= Building Debug Base ========="
@@ -305,11 +366,48 @@ _p_end:
 	@echo "========= Finsihed Debug Base ========="
 	@echo ""
 
+#################################################################################
+############## Testing Rules ####################################################
+#################################################################################
+
+
+## TESTING RULES
+$(TO_DIR)/%.o: $(TS_DIR)/%.c $(DEPS) $(TEST_DEPS) | $$(@D)/.
+	@echo "---- Building $@"
+	@$(strip $(CC) $(OPTFLAGS) $(T_FLAGS) -c -o $@ $<)
+
+$(T_R_FILES): $(TO_DIR)/$$(basename $$(@F)).o $(OBJS) | $$(@D)/.
+	@echo "++ Linking $@"
+	@$(strip $(CC) $(OPTFLAGS) $(DEBUG_FLAGS) $(T_FLAGS) -o $@ $^ $(T_LIBS))
+
+## Debuging test
+$(TO_DIR)/%.d.o: $(TS_DIR)/%.c $(DEPS) $(TEST_DEPS) | $$(@D)/.
+	@echo "---- Building $@"
+	@$(strip $(CC) $(OPTFLAGS) $(DEBUG_FLAGS) $(T_FLAGS) -c -o $@ $<)
+
+$(DT_R_FILES): $(TO_DIR)/$$(basename $$(@F)).o $(D_OBJS) | $$(@D)/.
+	@echo "++ Linking $@"
+	@$(strip $(CC) $(OPTFLAGS) $(DEBUG_FLAGS) $(T_FLAGS) -o $@ $^ $(T_LIBS))
+
+## Profiling test
+$(TO_DIR)/%.p.o: $(TS_DIR)/%.c $(DEPS) $(TEST_DEPS) | $$(@D)/.
+	@echo "---- Building $@"
+	@$(strip $(CC) $(OPTFLAGS) $(PROF_FLAGS) $(T_FLAGS) -c -o $@ $<)
+
+$(PT_R_FILES): $(TO_DIR)/$$(basename $$(@F)).o $(P_OBJS) | $$(@D)/.
+	@echo "++ Linking $@"
+	@$(strip $(CC) $(OPTFLAGS) $(PROF_FLAGS) $(T_FLAGS) -o $@ $^ $(T_LIBS))
+
+_pt_basic: $(PT_R_FILES)
+_dt_basic: $(DT_R_FILES)
+_t_basic: $(T_R_FILES)
+
 
 ##################################################################################################
 ########################## BUILD RULES for different flags #######################################
 ##################################################################################################
 
+BASENAME = $$(basename $$(@F))
 FOLDER = $$(@D)/.
 define FLAG_SET
 $(1)FLAGS := $(2)
@@ -326,6 +424,10 @@ $(1)P_MAIN := $$(patsubst %.o,$$(OODIR)/$(1)/%.p.o,$$(_MAIN))
 $(1)B_MAIN :=  $$(patsubst %.o,$$(OODIR)/$(1)/%.o,$$(_B_MAIN))
 $(1)DB_MAIN :=  $$(patsubst %.o,$$(OODIR)/$(1)/%.d.o,$$(_B_MAIN))
 $(1)PB_MAIN :=  $$(patsubst %.o,$$(OODIR)/$(1)/%.p.o,$$(_B_MAIN))
+
+$(1)T_R_FILES := $$(patsubst %.o,$$(TB_DIR)/$(1)/%.a,$(_TEST_FILES))
+$(1)DT_R_FILES := $$(patsubst %.o,$$(TB_DIR)/$(1)/%.d.a,$(_TEST_FILES))
+$(1)PT_R_FILES := $$(patsubst %.o,$$(TB_DIR)/$(1)/%.p.a,$(_TEST_FILES))
 
 ### Assebler code generation
 $(OADIR)/$(1)/%.s: $(SDIR)/%.c $$(DEPS) | $$(FOLDER)
@@ -366,7 +468,7 @@ $(OODIR)/$(1)/%.d.o: $$(SDIR)/%.cpp $$(DEPS) $$(BENCH_DEPS)  | $$(FOLDER)
 	@$$(strip $(CC) $$($(1)FLAGS) $$(DEBUG_FLAGS) $$(B_FLAGS) -c -o $$@ $$<)
 
 ## Linking bechmark
-$(BDIR)/$(1)/$(EXE).d.a: $$($(1)D_OBJS) $$($(1)D_MAIN) | $$(RDIR)/. $$(FOLDER).
+$(BDIR)/$(1)/$(EXE).d.a: $$($(1)D_OBJS) $$($(1)D_MAIN) | $$(RDIR)/. $$(FOLDER)
 	@echo "++ Linking $$@ "
 	@$$(strip $(CC) $$($(1)FLAGS) $$(DEBUG_FLAGS) $$(FLAGS) -o $$@ $$^ $$(LIBS))
 
@@ -393,11 +495,48 @@ $(BDIR)/$(1)/B_$(EXE).p.a: $$($(1)P_OBJS) $$($(1)PB_MAIN) | $$(RDIR)/. $$(FOLDER
 	@echo "++ Linking $$@"
 	@$$(strip $(CC) $$($(1)FLAGS) $$(PROF_FLAGS) $$(B_FLAGS) -o $$@ $$^ $(B_LIBS))
 
-.PHONY: $(1) D$(1) P$(1) _$(1)asm
-$(1): _$(1)START $(1)asm $$(BDIR)/$(1)/B_$$(EXE).a $$(BDIR)/$(1)/$$(EXE).a _$(1)END
-D$(1): _D$(1)START $(1)asm $$(BDIR)/$(1)/B_$$(EXE).d.a $$(BDIR)/$(1)/$$(EXE).d.a _D$(1)END
-P$(1): _P$(1)START  $(1)asm $$(BDIR)/$(1)/B_$$(EXE).p.a $$(BDIR)/$(1)/$$(EXE).p.a _P$(1)END
+#################################################################################
+############## Testing Rules ####################################################
+#################################################################################
+$$(TO_DIR)/$(1)/%.o: $$(TS_DIR)/%.c $$(DEPS) $$(TEST_DEPS) | $$(FOLDER)
+	@echo "---- Building $$@"
+	@$(strip $(CC) $$($(1)FLAGS) $(T_FLAGS) -c -o $$@ $$<)
+
+$$($(1)T_R_FILES): $(TO_DIR)/$(1)/$$(BASENAME).o $$($(1)OBJS) | $$(FOLDER)
+	@echo "++ Linking $$@"
+	@$(strip $(CC) $$($(1)FLAGS) $(DEBUG_FLAGS) $(T_FLAGS) -o $$@ $$^ $(T_LIBS))
+
+## Debuging test
+$$(TO_DIR)/$(1)/%.d.o: $$(TS_DIR)/%.c $$(DEPS) $$(TEST_DEPS) | $$(FOLDER)
+	@echo "---- Building $$@"
+	@$(strip $(CC) $$($(1)FLAGS) $(DEBUG_FLAGS) $(T_FLAGS) -c -o $$@ $$<)
+
+$$($(1)DT_R_FILES): $$(TO_DIR)/$$(BASENAME).o $$($(1)D_OBJS) | $$(FOLDER)
+	@echo "++ Linking $$@"
+	@$(strip $(CC) $$($(1)FLAGS) $(DEBUG_FLAGS) $(T_FLAGS) -o $$@ $$^ $(T_LIBS))
+
+## Profiling test
+$$(TO_DIR)/$(1)/%.p.o: $$(TS_DIR)/%.c $$(DEPS) $$(TEST_DEPS) | $$(FOLDER)
+	@echo "---- Building $$@"
+	@$(strip $$(CC) $$($(1)FLAGS) $$(PROF_FLAGS) $$(T_FLAGS) -c -o $$@ $$<)
+
+$$($(1)PT_R_FILES): $(TO_DIR)/$$(BASENAME).o $$($(1)P_OBJS) | $$(FOLDER)
+	@echo "++ Linking $$@"
+	@$(strip $(CC) $$($(1)FLAGS) $(PROF_FLAGS) $(T_FLAGS) -o $$@ $$^ $(T_LIBS))
+
+
+
+.PHONY: $(1) D$(1) P$(1) _$(1)asm PT$(1) DT$(1)
+$(1): _$(1)START $(1)asm $$(BDIR)/$(1)/B_$$(EXE).a $$(BDIR)/$(1)/$$(EXE).a T$(1) _$(1)END
+D$(1): _D$(1)START $(1)asm $$(BDIR)/$(1)/B_$$(EXE).d.a $$(BDIR)/$(1)/$$(EXE).d.a DT$(1) _D$(1)END
+P$(1): _P$(1)START  $(1)asm $$(BDIR)/$(1)/B_$$(EXE).p.a $$(BDIR)/$(1)/$$(EXE).p.a PT$(1) _P$(1)END
+T$(1): $$($(1)T_R_FILES)
+DT$(1): $$($(1)DT_R_FILES)
+PT$(1): $$($(1)PT_R_FILES)
+
 $(1)asm: $$($(1)ASM)
+
+
 
 .PHONY: _$(1)START _D$(1)START _P$(1)START
 _$(1)START:
@@ -445,7 +584,7 @@ $(eval $(call FLAG_SET,ogn,-Og -march=native))
 ###############################
 
 
-.PHONY: base project all
+.PHONY: base base_test project all
 base: _basic
 project: o0 o2 o2n
 all: _basic oall
@@ -488,6 +627,8 @@ clean_obj:
 	@rm -f $(ODIR)/*.o $(ODIR)/*/*.o
 	@echo "---- Cleaning Optimization Objects"
 	@rm -f $(OODIR)/*.o $(OODIR)/*/*.o 
+	@echo "---- Cleaning Test Objects"
+	@rm -f $(TO_DIR)/*.o $(TO_DIR)/*/*.o 
 
 clean_asm:
 	@echo "---- Cleaning Assembler code"
@@ -496,8 +637,10 @@ clean_asm:
 	@rm -f $(OADIR)/*.s $(OADIR)/*/*.s
 
 clean_bin:
-	@echo "---- Cleaning bin"
+	@echo "---- Cleaning Binaries"
 	@rm -f $(BDIR)/*.a $(BDIR)/*/*.a 
+	@echo "---- Cleaning Test Binaries"
+	@rm -f $(TB_DIR)/*.a $(TB_DIR)/*/*.a 
 
 clean-results:
 	@echo "---- Cleaning Results"
@@ -508,4 +651,4 @@ clean-folders:
 	@echo "---- Removing Folders"
 	@rm -fr $(ADIR) $(OADIR) $(BDIR) $(ODIR) $(OODIR) $(RDIR)
 
-clean-all: clean clean-results clean-folders clean-celero
+clean-all: clean clean-results clean-folders clean-celero clean-unity

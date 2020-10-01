@@ -1,0 +1,2 @@
+valgrin --tool=massif ./run.a
+ms_print massif.out.22222 > main.c.annotated
