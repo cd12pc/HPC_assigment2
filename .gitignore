@@ -9,3 +9,8 @@ lib/CeleroBuild
 lib/CeleroBuild/*
 results
 results/*
+
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tar.xz
