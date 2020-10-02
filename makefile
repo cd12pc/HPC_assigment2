@@ -24,7 +24,7 @@ ODIR :=./obj
 BO_DIR :=./obj/bench
 # Optimization Object Directory (Dynamic)
 OODIR :=./obj_o
-BOO_DIR :=./obj_
+BOO_DIR :=./obj_o/bench
 # Binary Directory (Dynamic)
 BDIR :=./bin
 BB_DIR :=./bin/bench
@@ -66,7 +66,7 @@ PROF_FLAGS:= -g -pg
 
 
 # Normal Optimiztion Flags
-OPTFLAGS :=
+OPTFLAGS := -O2 -march=native
 
 # Linker Flags
 LDFLAGS :=
@@ -75,6 +75,7 @@ BENCH_LDFLAGS :=
 
 # Asmbler output flags
 ASM_FLAGS := -fverbose-asm -g
+
 
 
 ###########################
@@ -109,7 +110,6 @@ PB_R_FILES := $(patsubst %.o,$(BB_DIR)/%.p.a,$(notdir $(_BENCHMARK_FILES)))
 
 # Testing main to build
 _TEST_FILES := test.o
-
 T_R_FILES := $(patsubst %.o,$(TB_DIR)/%.a,$(_TEST_FILES))
 DT_R_FILES := $(patsubst %.o,$(TB_DIR)/%.d.a,$(_TEST_FILES))
 PT_R_FILES := $(patsubst %.o,$(TB_DIR)/%.p.a,$(_TEST_FILES))
@@ -328,7 +328,7 @@ $(BDIR)/$(EXE).d.a: $(D_OBJS) $(D_MAIN) | $(RDIR)/. $$(@D)/.
 	@echo "++ Linking $@"
 	@$(strip $(CC) $(OPTFLAGS) $(DEBUG_FLAGS) $(FLAGS) -o $@ $^ $(LIBS))
 
-$(DB_R_FILES): $(D_OBJS) $(ODIR)/$$(basename $$(@F)).o | $(RDIR)/. $$(@D)/.
+$(DB_R_FILES): $(D_OBJS) $(BO_DIR)/$$(basename $$(@F)).o | $(RDIR)/. $$(@D)/.
 	@echo "++ Linking $@ $(*F) "
 	@$(strip $(CC) $(OPTFLAGS) $(DEBUG_FLAGS) $(B_FLAGS)  -o $@ $^ $(B_LIBS))
 
@@ -361,10 +361,9 @@ $(BDIR)/$(EXE).p.a: $(P_OBJS) $(P_MAIN) | $(RDIR)/. $$(@D)/.
 	@echo "++ Linking $@"
 	@$(strip $(CC) $(OPTFLAGS) $(PROF_FLAGS) $(FLAGS) -o $@ $^ $(LIBS))
 
-$(PB_R_FILES): $(P_OBJS) $(ODIR)/$$(basename $$(@F)).o | $(RDIR)/. $$(@D)/.
+$(PB_R_FILES): $(P_OBJS) $(BO_DIR)/$$(basename $$(@F)).o | $(RDIR)/. $$(@D)/.
 	@echo "++ Linking $@"
 	@$(strip $(CC) $(OPTFLAGS) $(PROF_FLAGS) $(B_FLAGS) -o $@ $^ $(B_LIBS))
-
 
 .PHONY: _p_start _p_basic _p_end
 _p_basic: _p_start $(A_FILES) $(PB_R_FILES) $(BDIR)/$(EXE).p.a _pt_basic _p_end
@@ -417,9 +416,13 @@ _t_basic: $(T_R_FILES)
 ########################## BUILD RULES for different flags #######################################
 ##################################################################################################
 
+
+
 BASENAME = $$(basename $$(@F))
 FOLDER = $$(@D)/.
 define FLAG_SET
+$(1)BO_DIR = $(OODIR)/$(1)/bench
+
 $(1)FLAGS := $(2)
 $(1)ASM := $$(patsubst %.o,$$(OADIR)/$(1)/%.s,$$(_OBJS))
 
@@ -435,13 +438,41 @@ $(1)B_MAIN :=  $$(patsubst %.o,$$(OODIR)/$(1)/%.o,$$(_B_MAIN))
 $(1)DB_MAIN :=  $$(patsubst %.o,$$(OODIR)/$(1)/%.d.o,$$(_B_MAIN))
 $(1)PB_MAIN :=  $$(patsubst %.o,$$(OODIR)/$(1)/%.p.o,$$(_B_MAIN))
 
-$(1)B_R_FILES := $$(patsubst %.o,$$(BB_DIR)/$(1)/%.a,$(_BENCHMARK_FILES))
-$(1)DB_R_FILES := $$(patsubst %.o,$$(BB_DIR)/$(1)/%.d.a,$(_BENCHMARK_FILES))
-$(1)PB_R_FILES := $$(patsubst %.o,$$(BB_DIR)/$(1)/%.p.a,$(_BENCHMARK_FILES))
+$(1)B_R_FILES := $$(patsubst %.o,$$(BB_DIR)/$(1)/%.a,$$(_BENCHMARK_FILES))
+$(1)DB_R_FILES := $$(patsubst %.o,$$(BB_DIR)/$(1)/%.d.a,$$(_BENCHMARK_FILES))
+$(1)PB_R_FILES := $$(patsubst %.o,$$(BB_DIR)/$(1)/%.p.a,$$(_BENCHMARK_FILES))
 
-$(1)T_R_FILES := $$(patsubst %.o,$$(TB_DIR)/$(1)/%.a,$(_TEST_FILES))
-$(1)DT_R_FILES := $$(patsubst %.o,$$(TB_DIR)/$(1)/%.d.a,$(_TEST_FILES))
-$(1)PT_R_FILES := $$(patsubst %.o,$$(TB_DIR)/$(1)/%.p.a,$(_TEST_FILES))
+$(1)T_R_FILES := $$(patsubst %.o,$$(TB_DIR)/$(1)/%.a,$$(_TEST_FILES))
+$(1)DT_R_FILES := $$(patsubst %.o,$$(TB_DIR)/$(1)/%.d.a,$$(_TEST_FILES))
+$(1)PT_R_FILES := $$(patsubst %.o,$$(TB_DIR)/$(1)/%.p.a,$$(_TEST_FILES))
+
+.PHONY: _$(1)START _D$(1)START _P$(1)START
+_$(1)START:
+	@echo "========= Building $(1) ========="
+	@echo "$$($(1)OBJS)"
+	@echo "$$($(1)B_R_FILES)"
+	@echo "$$($(1)MAIN) $$($(1)OBJS) "
+	@echo "$(BO_DIR)"
+	@echo "$(OODIR)"
+	@echo "$(ODIR)"
+_D$(1)START:
+	@echo "========= Building Debugging $(1) ========="
+
+_P$(1)START:
+	@echo "========= Building Profling $(1) ========="
+
+.PHONY: _$(1)END _D$(1)END _P$(1)END
+_$(1)END:
+	@echo "========= Finsihed $(1) ========="
+	@echo ""
+
+_D$(1)END:
+	@echo "========= Finsihed Debugging $(1) ========="
+	@echo ""
+
+_P$(1)END:
+	@echo "========= Finsihed Profiling $(1) ========="
+	@echo ""
 
 
 ### Assebler code generation
@@ -455,22 +486,24 @@ $(OADIR)/$(1)/%.s: $(SDIR)/%.cpp $$(DEPS) $(BENCH_DEPS) | $$(FOLDER)
 
 ############ STANDARD BUILD ##############
 ## Building Objects
-$(OODIR)/$(1)/%.o: $$(SDIR)/%.c $$(DEPS) | $$(FOLDER)
+$$(OODIR)/$(1)/%.o: $$(SDIR)/%.c $$(DEPS) | $$(FOLDER)
 	@echo "---- Building $$@" 
 	@$$(strip $(CC) $$($(1)FLAGS) $$(FLAGS) -c -o $$@ $$<)
 
-$(OODIR)/$(1)/%.o: $$(SDIR)/%.cpp $$(DEPS) $$(BENCH_DEPS)  | $$(FOLDER)
+$$(OODIR)/$(1)/%.o: $$(SDIR)/%.cpp $$(DEPS) $$(BENCH_DEPS)  | $$(FOLDER)
 	@echo "---- Building $$@"
 	@$$(strip $(CC) $$($(1)FLAGS) $$(B_FLAGS) -c -o $$@ $$<)
 
 ## Linking bechmark
-$(BDIR)/$(1)/$(EXE).a: $$($(1)OBJS) $$($(1)MAIN) | $$(RDIR)/. $$(FOLDER).
+$(BDIR)/$(1)/$(EXE).a: $$($(1)OBJS) $$($(1)MAIN) | $$(RDIR)/. $$(FOLDER)
 	@echo "++ Linking $$@ "
 	@$$(strip $(CC) $$($(1)FLAGS) $$(FLAGS) -o $$@ $$^ $$(LIBS))
 
-$($(1)B_R_FILES): $(OBJS) $(BO_DIR)/$(1)/$$(basename $$(@F)).o | $(RDIR)/. $$(@D)/.
-	@echo "++ Linking $@"
-	@$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -o $@ $^ $(B_LIBS))
+$$($(1)B_R_FILES): $$($(1)OBJS) $$($(1)BO_DIR)/$$(BASENAME).o | $(RDIR)/. $$(FOLDER)
+	@echo "++ Linking $$@"
+	@$$(strip $$(CC) $$($(1)FLAGS) $$(B_FLAGS) -o $$@ $$^ $$(B_LIBS))
+
+
 
 ########### DEBUG BUILD #####################
 ## Building Objects
@@ -487,9 +520,10 @@ $(BDIR)/$(1)/$(EXE).d.a: $$($(1)D_OBJS) $$($(1)D_MAIN) | $$(RDIR)/. $$(FOLDER)
 	@echo "++ Linking $$@ "
 	@$$(strip $(CC) $$($(1)FLAGS) $$(DEBUG_FLAGS) $$(FLAGS) -o $$@ $$^ $$(LIBS))
 
-$(BDIR)/$(1)/B_$(EXE).d.a: $$($(1)D_OBJS) $$($(1)DB_MAIN) | $$(RDIR)/. $$(FOLDER)
+$$($(1)DB_R_FILES): $$($(1)D_OBJS) $$($(1)BO_DIR)/$$(BASENAME).o | $(RDIR)/. $$(FOLDER)
 	@echo "++ Linking $$@"
-	@$$(strip $(CC) $$($(1)FLAGS) $$(DEBUG_FLAGS) $$(B_FLAGS) -o $$@ $$^ $(B_LIBS))
+	@$$(strip $$(CC) $$($(1)FLAGS) $$(DEBUG_FLAGS) $$(B_FLAGS) -o $$@ $$^ $$(B_LIBS))
+
 
 ########### PERF BUILD #####################
 ## Building Objects
@@ -506,9 +540,9 @@ $(BDIR)/$(1)/$(EXE).p.a: $$($(1)P_OBJS) $$($(1)P_MAIN) | $$(RDIR)/. $$(FOLDER).
 	@echo "++ Linking $$@ "
 	@$$(strip $(CC) $$($(1)FLAGS) $$(PROF_FLAGS) $$(FLAGS)-o $$@ $$^ $$(LIBS))
 
-$(BDIR)/$(1)/B_$(EXE).p.a: $$($(1)P_OBJS) $$($(1)PB_MAIN) | $$(RDIR)/. $$(FOLDER)
+$$($(1)PB_R_FILES): $$($(1)P_OBJS) $$($(1)BO_DIR)/$$(BASENAME).o | $(RDIR)/. $$(FOLDER)
 	@echo "++ Linking $$@"
-	@$$(strip $(CC) $$($(1)FLAGS) $$(PROF_FLAGS) $$(B_FLAGS) -o $$@ $$^ $(B_LIBS))
+	@$$(strip $$(CC) $$($(1)FLAGS) $$(DEBUG_FLAGS) $$(B_FLAGS) -o $$@ $$^ $$(B_LIBS))
 
 #################################################################################
 ############## Testing Rules ####################################################
@@ -542,9 +576,9 @@ $$($(1)PT_R_FILES): $(TO_DIR)/$$(BASENAME).o $$($(1)P_OBJS) | $$(FOLDER)
 
 
 .PHONY: $(1) D$(1) P$(1) _$(1)asm PT$(1) DT$(1)
-$(1): _$(1)START $(1)asm $$(BDIR)/$(1)/$$(EXE).a T$(1) $($(1)B_R_FILES) _$(1)END
-D$(1): _D$(1)START $(1)asm $$(BDIR)/$(1)/B_$$(EXE).d.a $$(BDIR)/$(1)/$$(EXE).d.a DT$(1) _D$(1)END
-P$(1): _P$(1)START  $(1)asm $$(BDIR)/$(1)/B_$$(EXE).p.a $$(BDIR)/$(1)/$$(EXE).p.a PT$(1) _P$(1)END
+$(1): _$(1)START $(1)asm $$(BDIR)/$(1)/$$(EXE).a T$(1) $$($(1)B_R_FILES) _$(1)END
+D$(1): _D$(1)START $(1)asm $$(BDIR)/$(1)/$$(EXE).d.a $$($(1)DB_R_FILES) DT$(1) _D$(1)END
+P$(1): _P$(1)START  $(1)asm $$(BDIR)/$(1)/$$(EXE).p.a $$($(1)PB_R_FILES) PT$(1) _P$(1)END
 T$(1): $$($(1)T_R_FILES)
 DT$(1): $$($(1)DT_R_FILES)
 PT$(1): $$($(1)PT_R_FILES)
@@ -552,29 +586,6 @@ PT$(1): $$($(1)PT_R_FILES)
 $(1)asm: $$($(1)ASM)
 
 
-
-.PHONY: _$(1)START _D$(1)START _P$(1)START
-_$(1)START:
-	@echo "========= Building $(1) ========="
-
-_D$(1)START:
-	@echo "========= Building Debugging $(1) ========="
-
-_P$(1)START:
-	@echo "========= Building Profling $(1) ========="
-
-.PHONY: _$(1)END _D$(1)END _P$(1)END
-_$(1)END:
-	@echo "========= Finsihed $(1) ========="
-	@echo ""
-
-_D$(1)END:
-	@echo "========= Finsihed Debugging $(1) ========="
-	@echo ""
-
-_P$(1)END:
-	@echo "========= Finsihed Profiling $(1) ========="
-	@echo ""
 
 endef
 
