@@ -3,10 +3,17 @@ asm/*
 asm_o/*
 obj/*
 obj_o/*
+bin_test/*
+obj_test/*
+
+
 lib/Celero
 lib/Celero/*
 lib/CeleroBuild
 lib/CeleroBuild/*
+lib/Unity
+lib/UnityBuild
+
 results
 results/*
 

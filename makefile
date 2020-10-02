@@ -30,9 +30,9 @@ ADIR :=./asm
 # Assmebelr Optimization output directory (Dynamic)
 OADIR :=./asm_o
 # Test source directory
-TS_DIR :=./src_t
-TB_DIR :=./bin_t
-TO_DIR :=./obj_t
+TS_DIR :=./src_test
+TB_DIR :=./bin_test
+TO_DIR :=./obj_test
 
 RDIR := ./results
 
@@ -151,8 +151,8 @@ clean-celero:
 #################################################
 ######### Build Unity for testing ##############
 ################################################
-UNITYDIR := lib/unity
-UNITYDIR_B := lib/unityBuild
+UNITYDIR := lib/Unity
+UNITYDIR_B := lib/UnityBuild
 
 TEST_FLAGS += -I./$(UNITYDIR)/src
 TEST_LIBS += -L$(UNITYDIR_B) -lunity
@@ -649,6 +649,6 @@ clean-results:
 
 clean-folders:
 	@echo "---- Removing Folders"
-	@rm -fr $(ADIR) $(OADIR) $(BDIR) $(ODIR) $(OODIR) $(RDIR)
+	@rm -fr $(ADIR) $(OADIR) $(BDIR) $(ODIR) $(OODIR) $(RDIR) $(TB_DIR) $(TO_DIR)
 
 clean-all: clean clean-results clean-folders clean-celero clean-unity
