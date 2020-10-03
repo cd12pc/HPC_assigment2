@@ -46,7 +46,7 @@ RDIR := ./results
 #Libaries
 LIBS := 
 #Benchamrking Libaries
-BENCH_LIBS = -lstdc++
+BENCH_LIBS = -lstdc++ -lm
 
 
 #####################
@@ -75,8 +75,6 @@ BENCH_LDFLAGS :=
 
 # Asmbler output flags
 ASM_FLAGS := -fverbose-asm -g
-
-
 
 ###########################
 #### Files in use #########
@@ -299,7 +297,7 @@ $(BDIR)/$(EXE).a: $(OBJS) $(MAIN) | $(RDIR)/. $$(@D)/.
 
 $(B_R_FILES): $(OBJS) $(BO_DIR)/$$(basename $$(@F)).o | $(RDIR)/. $$(@D)/.
 	@echo "++ Linking $@"
-	@$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -o $@ $^ $(B_LIBS))
+	$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -o $@ $^ $(B_LIBS))
 
 .PHONY: _start _basic _end
 _basic: _start $(BDIR)/$(EXE).a $(B_R_FILES) $(A_FILES) _t_basic _end
