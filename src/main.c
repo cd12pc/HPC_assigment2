@@ -6,7 +6,7 @@ int main() {
 
     float input[3*16];
     float result[16];
-    int i_result[16];
+    size_t i_result[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     float base[3] = {1.f, 1.f, 1.f}; 
     
     for(int i = 0; i < 16; ++i){
