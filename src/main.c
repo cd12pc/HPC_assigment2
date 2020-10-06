@@ -16,7 +16,6 @@ int main() {
         result[i] = 0;
     }
 
-    find_16_distances(result, base, input);
     find_16_distance_indices(i_result, base, input);
     
     for(int i = 0; i < 16; ++i){

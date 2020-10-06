@@ -81,7 +81,7 @@ ASM_FLAGS := -fverbose-asm -g
 ###########################
 
 #Dependancies files
-_DEPS :=  
+_DEPS :=  cell_distances.h
 DEPS := $(patsubst %,$(IDIR)/%,$(_DEPS))
 BENCH_DEPS :=
 

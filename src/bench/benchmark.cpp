@@ -43,7 +43,6 @@ class DistanceFixture : public celero::TestFixture
         ~DistanceFixture() {
             delete data;
         }
-
 };
 
 
@@ -69,9 +68,4 @@ BENCHMARK_F(Distance, AVX_indices, DistanceFixture, 0, 0) {
     celero::DoNotOptimizeAway(res);
 }
 
-
-BENCHMARK_F(Distance, AVX_distance , DistanceFixture, 0, 0) {
-    find_16_distances(fres, trip, data);
-    celero::DoNotOptimizeAway(fres);
-}
 

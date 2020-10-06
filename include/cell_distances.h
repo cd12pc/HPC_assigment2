@@ -20,10 +20,9 @@ static const int FLOATS_PER_ELEM = 3;
 static const int FLOATS_PER_BLOCK = FLOATS_PER_ELEM * ELEM_PER_BLOCK;
 
 
-static const int BLOCKS_IN_MEMORY = NUM_BLOCKS * ELEM_PER_BLOCK + 1;
-static const int DATA_FLOATS_IN_MEMORY = BLOCKS_IN_MEMORY * FLOATS_PER_ELEM;
+static const int ELEM_IN_MEMORY = NUM_BLOCKS * ELEM_PER_BLOCK + 1;
+static const int FLOATS_IN_MEMORY = ELEM_IN_MEMORY * FLOATS_PER_ELEM;
 
-void find_16_distances(float* result, float* base, float* input);
 void find_16_distance_indices(int32_t* result, float* base, float* input);
 
 #ifdef __cplusplus
