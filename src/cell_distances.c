@@ -14,12 +14,8 @@ int read_block_from_file(FILE* fp, int num_floats, int* elem_to_process, float* 
   //  printf("Error opening file\n");
   //  exit(1);
   //}
-
-  //fseek(fp, 0, SEEK_END);
-  //*file_size = ftell(fp);
-  //fseek(fp, saved, SEEK_SET);
-  
   int index = 0;
+  //fseek(fp, saved, SEEK_SET);
   fseek(fp, -8, SEEK_CUR);
 
   while( fscanf(fp,"%f ", &coords[index]) != EOF && index < num_floats ) {
