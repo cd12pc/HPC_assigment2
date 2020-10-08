@@ -1,4 +1,3 @@
-
 #ifndef _INCLUDE_cell_distance
 #define _INCLUDE_cell_distance
 
@@ -25,6 +24,8 @@ static const int FLOATS_IN_MEMORY = ELEM_IN_MEMORY * FLOATS_PER_ELEM;
 
 void find_16_distance_indices(size_t * result, float* base, float* input);
 
+int find_distrution_in_file(char* file_name);
+
 void find_distrution_from_data(
         uint64_t* distribution, 
         float* data_to_process,
@@ -34,7 +35,4 @@ void find_distrution_from_data(
 #ifdef __cplusplus
 }
 #endif
-
 #endif
-
-

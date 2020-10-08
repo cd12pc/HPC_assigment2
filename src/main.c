@@ -1,29 +1,33 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <omp.h>
 #include <cell_distances.h>
 
-int main() {
-
-
-    float input[3*16];
-    float result[16];
-    size_t i_result[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-    float base[3] = {1.f, 1.f, 1.f}; 
-    
-    for(int i = 0; i < 16; ++i){
-        input[3*i] = 1*i;
-        input[3*i+1] = 1*i;
-        input[3*i+2] = 1*i;
-        result[i] = 0;
+int main(int argc, char *argv[]) {
+    if( argc == 3 )
+    {
+        char* file_name = argv[1];
+        if(access(file_name, F_OK) != -1)
+        {
+            // file exists
+            int n_threads = atoi(argv[2]);
+            omp_set_dynamic(0);  // Explicitly disable dynamic teams
+            omp_set_num_threads(n_threads);
+            return find_distrution_in_file(file_name);
+        }
+        else
+        {
+            printf("The file \"%s\" does not exists\n", file_name);
+        }
     }
-
-    find_16_distance_indices(i_result, base, input);
-    
-    for(int i = 0; i < 16; ++i){
-        printf("r %f (%d), a %f, b %f, c %f\n",result[i], i_result[i], input[3*i], input[3*i+1], input[3*i+2]);
+    else
+    {
+        printf("\nThe script requires two positional arguments:\n");
+        printf("An input file, e.g. \"./data/test_data/cell_50\"\n");
+        printf("A thread count, e.g. \"8\".\n");
+        printf("\n");
+        printf("The final command should look something like this: \"bin/run.a ./data/test_data/cell_50 8\"\n");
     }
-    // printf() displays the string inside quotation
-       //    printf("Hello, World!");
-       //       return 0;
-       //       
+    return -1; 
 }
-
