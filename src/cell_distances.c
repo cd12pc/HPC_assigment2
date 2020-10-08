@@ -6,8 +6,34 @@
 #include <immintrin.h>
 
 
-int read_block_from_file(char* file, int a, float* b, int c, int* d) {
-    //READ A BLOCK OF DATA FROM FILE
+int read_block_from_file(FILE* fp, int num_floats, int* elem_to_process, float* coords, int* end_of_file) {
+  
+  //FILE *fp = fopen(file_name, "r");
+
+  //if (fp == NULL) {
+  //  printf("Error opening file\n");
+  //  exit(1);
+  //}
+
+  //fseek(fp, 0, SEEK_END);
+  //*file_size = ftell(fp);
+  //fseek(fp, saved, SEEK_SET);
+  
+  int index = 0;
+  fseek(fp, -8, SEEK_CUR);
+
+  while( fscanf(fp,"%f ", &coords[index]) != EOF && index < num_floats ) {
+    index++;
+  }
+ 
+  if (feof(fp)) {
+    *end_of_file = 1;
+  }
+  //saved = ftell(fp);
+  //fclose(fp);
+  *elem_to_process = index;
+  
+  return *end_of_file;
 }
 
 
@@ -122,23 +148,23 @@ void find_distrution_from_data(
 }
 
 
-int find_distrution_in_file(char* file_name) {
+ int find_distrution_in_file(FILE* file_name) {
 
     int file_location = 0;
-
     unsigned long long* distribution = (unsigned long long*) calloc(DIST_SIZE, sizeof(unsigned long long));
 
     float trip[3] = {0., 0., 0.};
     int elements_to_process = 0;
-    
+    int end_of_file = 0;
+    //long saved;
     float* data_to_process = (float *) malloc(FLOATS_IN_MEMORY * sizeof(float));
 
-    while(read_block_from_file(
+    while(!read_block_from_file(
                 file_name,
-                file_location,
-                data_to_process,
-                ELEM_IN_MEMORY,
-                &elements_to_process)) {
+		FLOATS_IN_MEMORY,
+		&elements_to_process,
+		data_to_process,
+                &end_of_file)) {
         trip[0] = data_to_process[0];
         trip[1] = data_to_process[1];
         trip[2] = data_to_process[2];
