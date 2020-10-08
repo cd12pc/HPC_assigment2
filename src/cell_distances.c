@@ -6,30 +6,42 @@
 #include <immintrin.h>
 #include <math.h>
 
-int read_block_from_file(FILE* fp, int num_floats, int* elem_to_process, float* coords, int* end_of_file) {
+int read_block_from_file(char* file_name, 
+    long* file_location,
+    int num_floats, 
+    int* elem_to_process, 
+    float* coords, 
+    int* end_of_file) {
+  *end_of_file = 0;
   
-  //FILE *fp = fopen(file_name, "r");
+  FILE *fp = fopen(file_name, "r");
+  if (fp == NULL) {
+    printf("Error opening file (%s)\n", fp);
+    exit(1);
+  }
 
-  //if (fp == NULL) {
-  //  printf("Error opening file\n");
-  //  exit(1);
-  //}
-  int index = 0;
-  //fseek(fp, saved, SEEK_SET);
+//  printf("Moving to: %d\n", *file_location);
+  fseek(fp, *file_location, SEEK_SET);
+  if(feof(fp)) {
+    *end_of_file = 1;
+    return 0;
+  }
   fseek(fp, -8, SEEK_CUR);
 
+  int index = 0;
   while( fscanf(fp,"%f ", &coords[index]) != EOF && index < num_floats ) {
     index++;
   }
  
+  *file_location = ftell(fp);
   if (feof(fp)) {
     *end_of_file = 1;
+//    printf("EOF: %d\n", *file_location);
   }
-  //saved = ftell(fp);
-  //fclose(fp);
-  *elem_to_process = index;
+  fclose(fp);
+  *elem_to_process = index / 3;
   
-  return *end_of_file;
+  return 1;
 }
 
 
@@ -92,7 +104,7 @@ void find_16_distance_indices(size_t * result, float* base, float* input) {
         float c = input[3*i + 2] - c_off;
         //printf("r: %f\n",r);
         result[i] = (size_t) roundf(PRECISION*sqrtf(a*a + b*b + c*c));
-;
+
     }
 
 #endif
@@ -157,8 +169,21 @@ void find_distrution_from_data(
     }
     int rem = elements_to_process % ELEM_PER_BLOCK;
 
-
-    find_16_distance_indices(indicies, trip, data_to_process + 3*(elements_to_process -rem));
+    float stack_data[FLOATS_PER_BLOCK];
+    
+    for(size_t i = 0; i < rem; ++i) {
+        stack_data[3*i] 
+          = data_to_process[3*(elements_to_process - rem + i)];
+        stack_data[3*i + 1] 
+          = data_to_process[3*(elements_to_process - rem + i) +1];
+        stack_data[3*i + 2] 
+          = data_to_process[3*(elements_to_process - rem + i) +2];
+    }
+    
+    find_16_distance_indices(
+        indicies, 
+        trip, 
+        stack_data);
 
     for(size_t i = 0; i < rem; ++i) {
         distribution[indicies[i]]++;
@@ -166,44 +191,93 @@ void find_distrution_from_data(
 }
 
 
- int find_distrution_in_file(FILE* file_name) {
-
-    int file_location = 0;
-<<<<<<< HEAD
-    unsigned long long* distribution = (unsigned long long*) calloc(DIST_SIZE, sizeof(unsigned long long));
-=======
+ int find_distrution_in_file(char* file_name) {
+    long start_location = 0;
+    long file_location = 0;
 
     uint64_t* distribution = (uint64_t*) calloc(DIST_SIZE, sizeof(uint64_t));
->>>>>>> 00694967a1d3395e51a65a570388be9e0f9f77c3
 
     float trip[3] = {0., 0., 0.};
     int elements_to_process = 0;
     int end_of_file = 0;
-    //long saved;
     float* data_to_process = (float *) malloc(FLOATS_IN_MEMORY * sizeof(float));
 
-    while(!read_block_from_file(
-                file_name,
+
+    while(read_block_from_file(
+        file_name,
+        &file_location,
 		FLOATS_IN_MEMORY,
 		&elements_to_process,
-		data_to_process,
-                &end_of_file)) {
-        trip[0] = data_to_process[0];
-        trip[1] = data_to_process[1];
-        trip[2] = data_to_process[2];
+        data_to_process,
+        &end_of_file)) {
 
+/*      for(int i = 0; i < ELEM_PER_BLOCK+1; i++) {
+          printf("(1) %d = %f | %f | %f\n", i,
+              data_to_process[3*i], 
+              data_to_process[3*i + 1], 
+              data_to_process[3*i + 2]);
+      }
+*/
+      //printf("1: sl %d\n", start_location);
+      //printf("1 : fl %d\n", file_location);
+      if(end_of_file) {
+        for(int ie = 0; ie < elements_to_process; ++ ie) {
+          trip[0] = data_to_process[3*ie];
+          trip[1] = data_to_process[3*ie+1];
+          trip[2] = data_to_process[3*ie+2];
+
+          find_distrution_from_data(
+              distribution, 
+              data_to_process+3*(1+ie),
+              elements_to_process-(1+ie),
+              trip);
+        }
+        break;
+      }
+
+      trip[0] = data_to_process[0];
+      trip[1] = data_to_process[1];
+      trip[2] = data_to_process[2];
+
+      find_distrution_from_data(
+          distribution, 
+          data_to_process+3,
+          elements_to_process-1,
+          trip);
+
+      while(!end_of_file && read_block_from_file(
+          file_name,
+          &file_location,
+          FLOATS_IN_MEMORY,
+          &elements_to_process,
+          data_to_process,
+          &end_of_file)) {
+
+      /*
+      for(int i = 0; i < ELEM_PER_BLOCK+1; i++) {
+          printf("(2) %d = %f | %f | %f\n", i,
+              data_to_process[3*i], 
+              data_to_process[3*i + 1], 
+              data_to_process[3*i + 2]);
+      }*/
+      //printf("2 : fl %d\n", file_location);
+      //printf("2 : eof %d\n", end_of_file);
         find_distrution_from_data(
-                distribution, 
-                data_to_process+3,
-                elements_to_process,
-                trip);
+          distribution, 
+          data_to_process,
+          elements_to_process,
+          trip);
+      }
+      start_location++;
+      file_location = 24 * start_location + 8;
     }
 
     float distance, freq;
     for(int i = 0; i < DIST_SIZE; ++i) {
-        distance = i / 100.f;
-        freq = distribution[i];
-        if(distance > 0) 
-            printf("%f %d\n", distance, freq);
+      distance = i / 100.f;
+      if(distribution[i] > 0) 
+            printf("%.2f %d\n", distance, distribution[i]);
     }
+
+    return 1;
 }
