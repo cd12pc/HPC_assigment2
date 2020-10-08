@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <cell_distances.h>
 #include <stdint.h>
+#include <omp.h>
 
 
 void test_distance_index(int n_elements) {
@@ -12,9 +13,9 @@ void test_distance_index(int n_elements) {
 
     int elem_stored = blocks * ELEM_PER_BLOCK;
     int all_floats = FLOATS_PER_ELEM * elem_stored;
-
+    
     //printf("%d\n", DIST_SIZE * sizeof(unsigned int));
-    float * data = (float *) malloc(all_floats * sizeof(float));
+    uint32_t * data = (uint32_t *) malloc(all_floats * sizeof(uint32_t));
     uint64_t * dist = (uint64_t *) malloc(DIST_SIZE * sizeof(uint64_t));
     for(size_t ix = 0; ix < DIST_SIZE; ix++) {
         dist[ix] = 0;
@@ -32,7 +33,7 @@ void test_distance_index(int n_elements) {
   //  printf("DATA: %p -> %p\n", data, data+all_floats-1);
   //  printf("DIST: %p -> %p\n", dist, dist+DIST_SIZE-1);
 
-    float ref[3] = {1.f,1.f,1.f};
+    uint32_t ref[3] = {1,1,1};
 
 
 
@@ -75,14 +76,14 @@ void test_distance_index(int n_elements) {
 
 
 void test_0_50_elem(void) {
-    for(int i = 0; i < 50; i++) {
+    for(int i = 1; i < 50; i++) {
         test_distance_index(i);
     }
 }
 
 void test_20_random_elem(void) {
     for(int i = 0; i < 10; i++) {
-        int r = rand() % 1000;
+        int r = 1 + rand() % 1000;
         test_distance_index(r);
     }
 }
@@ -99,6 +100,7 @@ void tearDown(void) {
 
 int main() {
     UNITY_BEGIN();
+    omp_set_num_threads(0);
     RUN_TEST(test_0_50_elem);
     RUN_TEST(test_20_random_elem);
 

@@ -28,6 +28,10 @@ int main(int argc, char *argv[]) {
         printf("A thread count, e.g. \"8\".\n");
         printf("\n");
         printf("The final command should look something like this: \"bin/run.a ./data/test_data/cell_50 8\"\n");
+        printf("Floats: %d\n", FLOATS_IN_MEMORY);
+        printf("Bytes %d\n", FLOATS_IN_MEMORY*32);
+        printf("GB %f\n", FLOATS_IN_MEMORY*32 / pow(2,30));
     }
+
     return -1; 
 }
