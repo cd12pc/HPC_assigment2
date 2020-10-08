@@ -19,7 +19,7 @@ class DistanceFixture : public celero::TestFixture
     public:
         float* data;
         float trip[3];
-        int res[16];
+        size_t res[16];
         float fres[16];
 
         DistanceFixture() {

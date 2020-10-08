@@ -44,9 +44,9 @@ RDIR := ./results
 ###########################
 
 #Libaries
-LIBS := 
+LIBS := -lm
 #Benchamrking Libaries
-BENCH_LIBS = -lstdc++ -lm
+BENCH_LIBS = -lstdc++
 
 
 #####################
@@ -107,7 +107,7 @@ DB_R_FILES := $(patsubst %.o,$(BB_DIR)/%.d.a,$(notdir $(_BENCHMARK_FILES)))
 PB_R_FILES := $(patsubst %.o,$(BB_DIR)/%.p.a,$(notdir $(_BENCHMARK_FILES)))
 
 # Testing main to build
-_TEST_FILES := test.o
+_TEST_FILES := test.o find_dist_test.o
 T_R_FILES := $(patsubst %.o,$(TB_DIR)/%.a,$(_TEST_FILES))
 DT_R_FILES := $(patsubst %.o,$(TB_DIR)/%.d.a,$(_TEST_FILES))
 PT_R_FILES := $(patsubst %.o,$(TB_DIR)/%.p.a,$(_TEST_FILES))

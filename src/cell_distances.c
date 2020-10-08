@@ -4,7 +4,7 @@
 #include <omp.h>
 #include <cell_distances.h>
 #include <immintrin.h>
-
+#include <math.h>
 
 int read_block_from_file(FILE* fp, int num_floats, int* elem_to_process, float* coords, int* end_of_file) {
   
@@ -35,8 +35,9 @@ int read_block_from_file(FILE* fp, int num_floats, int* elem_to_process, float* 
 
 
 
-void find_16_distance_indices(int32_t* result, float* base, float* input) {
+void find_16_distance_indices(size_t * result, float* base, float* input) {
 
+#ifdef _DEBUG_BUILD_
     __m512 _a, _a_off, _a2; // First index
     __m512 _b, _b_off, _b2; // Second index
     __m512 _c, _c_off, _c2; // Third index
@@ -80,24 +81,46 @@ void find_16_distance_indices(int32_t* result, float* base, float* input) {
     //Converting to indicies
     _index = _mm512_cvtps_epi32(_r_t100);
     _mm512_storeu_epi32(result, _index); // Store data in results
+#else
+    float a_off = base[0];
+    float b_off = base[1];
+    float c_off = base[2];
+
+    for(size_t i = 0; i < 16; ++i) {
+        float a = input[3*i] - a_off;
+        float b = input[3*i + 1] - b_off;
+        float c = input[3*i + 2] - c_off;
+        //printf("r: %f\n",r);
+        result[i] = (size_t) roundf(PRECISION*sqrtf(a*a + b*b + c*c));
+;
+    }
+
+#endif
+
+
 }
 
 
 
 void find_distrution_from_data(
-        unsigned long long* distribution, 
+        uint64_t * distribution, 
         float* data_to_process,
         int elements_to_process,
         float* trip)
 {
 
-    int32_t indicies[16];
+    int blocks_to_process = elements_to_process / ELEM_PER_BLOCK; 
+
+    size_t indicies[16] = {0, 0, 0, 0,0,0,0,0,0,0,0,0,0,0,0,0};
     //OLD:
     // #pragma omp parallel for reduction(+:distribution[:]) shared(trip, elements_to_process) private(indicies) 
     #pragma omp parallel for shared(trip, elements_to_process) private(indicies) 
-    for(size_t i = 0; i < elements_to_process; i += ELEM_PER_BLOCK) {
+    for(size_t i_block = 0; i_block < blocks_to_process; ++i_block) {
 
-        find_16_distance_indices(indicies,trip, data_to_process + 3*i); 
+        find_16_distance_indices(
+                indicies,
+                trip, 
+                data_to_process + FLOATS_PER_BLOCK*i_block); 
 
         #pragma omp atomic
         distribution[indicies[0]]++;
@@ -134,20 +157,24 @@ void find_distrution_from_data(
     }
     int rem = elements_to_process % ELEM_PER_BLOCK;
 
-    int32_t indicies2[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-    find_16_distance_indices(indicies2, trip, data_to_process + 3*(elements_to_process - rem));
+
+    find_16_distance_indices(indicies, trip, data_to_process + 3*(elements_to_process -rem));
 
     for(size_t i = 0; i < rem; ++i) {
         distribution[indicies[i]]++;
     }
-
 }
 
 
  int find_distrution_in_file(FILE* file_name) {
 
     int file_location = 0;
+<<<<<<< HEAD
     unsigned long long* distribution = (unsigned long long*) calloc(DIST_SIZE, sizeof(unsigned long long));
+=======
+
+    uint64_t* distribution = (uint64_t*) calloc(DIST_SIZE, sizeof(uint64_t));
+>>>>>>> 00694967a1d3395e51a65a570388be9e0f9f77c3
 
     float trip[3] = {0., 0., 0.};
     int elements_to_process = 0;
