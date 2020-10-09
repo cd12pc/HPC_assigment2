@@ -253,7 +253,7 @@ void find_distrution_from_data(
                   chunks_to_process[3*i_block + 2][i], trip[2],
                   indicies[i]);*/
 #pragma omp atomic
-      distribution[indicies[i]]++;
+    distribution[indicies[i]]++;
     }
   }
 }
