@@ -70,10 +70,10 @@ void test_distance_index(int n_elements) {
     for(int i = 0; i < elem_stored; ++i) {
         int h = i / FLOATS_PER_CHUNK;
         int v = i % FLOATS_PER_CHUNK;
-        printf("%d [%d][%d] = %d | %d | %d\n", i, h, v, data2[h][v], data2[h+1][v], data2[h][v]);
+        //printf("%d [%d][%d] = %d | %d | %d\n", i, h, v, data2[h][v], data2[h+1][v], data2[h][v]);
     }
 
-    printf("CPB: %d", FLOATS_PER_CHUNK);
+    //printf("CPB: %d", FLOATS_PER_CHUNK);
     find_distrution_from_data(dist, data2, 0, n_elements, ref);    
 
     for(size_t i = 0; i < DIST_SIZE; ++i) {

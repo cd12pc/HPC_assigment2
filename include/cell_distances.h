@@ -11,7 +11,7 @@ extern "C" {
 static const int SPACE_WIDTH = 20;
 static const int PRECISION = 100;
 
-static const int32_t DIST_SIZE = (int32_t) PRECISION*PRECISION*(3 * SPACE_WIDTH * SPACE_WIDTH) + 10; // Has to be larger than sqrt(3) * 20 * precision (In the task = 3464)
+static const int32_t DIST_SIZE = (int32_t) 1000*(sqrt(3) * SPACE_WIDTH) + 10; // Has to be larger than sqrt(3) * 20 * precision (In the task = 3464)
 
 
 
