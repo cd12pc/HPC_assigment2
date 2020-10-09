@@ -51,8 +51,6 @@ int main(int argc, char *argv[]) {
     }
     char* n_threads_str = argv[t_index];
     n_threads = atoi(n_threads_str + 2);
-    printf("%s\n", file_name);
-    printf("%d\n", n_threads);
     if(access(file_name, F_OK) != -1)
     {
         // file exists
