@@ -7,22 +7,31 @@
 
 
 void test_distance_index(int n_elements) {
-
-    double _blocks = ceil(n_elements / (1.0* ELEM_PER_BLOCK));
+    
+    double _blocks = ceil(n_elements / (1.0* FLOATS_PER_CHUNK));
     int blocks = _blocks;
 
-    int elem_stored = blocks * ELEM_PER_BLOCK;
-    int all_floats = FLOATS_PER_ELEM * elem_stored;
+    int elem_stored = blocks * FLOATS_PER_CHUNK;
+    int all_floats = blocks *  FLOATS_PER_CHUNK * CHUNKS_PER_BLOCK;
     
-    //printf("%d\n", DIST_SIZE * sizeof(unsigned int));
-    uint32_t * data = (uint32_t *) malloc(all_floats * sizeof(uint32_t));
+    printf("%d\n", all_floats);
+    printf("%d\n", blocks);
+    int16_t * data = (int16_t *) malloc(all_floats * sizeof(int16_t));
+    int16_t ** data2 = (int16_t **) malloc(CHUNKS_PER_BLOCK * blocks * sizeof(int16_t));
+    for(int i = 0; i < blocks; ++ i) {
+      data2[3*i] = data + 96 * i;
+      data2[3*i+1] = data + 96 * i + 32;
+      data2[3*i+2] = data + 96 * i + 64;
+    }
+
     uint64_t * dist = (uint64_t *) malloc(DIST_SIZE * sizeof(uint64_t));
     for(size_t ix = 0; ix < DIST_SIZE; ix++) {
         dist[ix] = 0;
     }
 
-
-
+    if(data2 == NULL){
+        printf("ERROR");
+    }
     if(data == NULL){
         printf("ERROR");
     }
@@ -32,35 +41,40 @@ void test_distance_index(int n_elements) {
 
   //  printf("DATA: %p -> %p\n", data, data+all_floats-1);
   //  printf("DIST: %p -> %p\n", dist, dist+DIST_SIZE-1);
-
-    uint32_t ref[3] = {1,1,1};
-
-
+  //
+    int16_t ref[3];
+    
+    ref[0] = 1;
+    ref[1] = 1;
+    ref[2] = 1;
 
     for(int i = 0; i < n_elements; ++i) {
-        data[3*i] = 2;
-        data[3*i + 1] = 2; 
-        data[3*i + 2] = 2;
-    }
+        int h = i / FLOATS_PER_CHUNK;
+        int v = i % FLOATS_PER_CHUNK;
 
-    for(int i = 0; i < DIST_SIZE; ++i) {
-        if(dist[i] > 0ULL) {
-            printf("%d %d\n", i, dist[i]);//9
-        }
+        data2[h][v] = 2;
+        data2[h+1][v] = 2; 
+        data2[h+2][v] = 2;
     }
 
 
     for(int i = n_elements; i < elem_stored; ++i) {
-        data[3*i] = 10;
-        data[3*i + 1] = 10;
-        data[3*i + 2] = 10;
+        int h = i / FLOATS_PER_CHUNK;
+        int v = i % FLOATS_PER_CHUNK;
+
+        data2[h][v] = 10;
+        data2[h+1][v] = 10; 
+        data2[h+2][v] = 10;
     }
-/*
+
     for(int i = 0; i < elem_stored; ++i) {
-        printf("%f | %f | %f\n", data[3*i], data[3*i+1], data[3*i+2]);
+        int h = i / FLOATS_PER_CHUNK;
+        int v = i % FLOATS_PER_CHUNK;
+        printf("%d [%d][%d] = %d | %d | %d\n", i, h, v, data2[h][v], data2[h+1][v], data2[h][v]);
     }
-*/
-    find_distrution_from_data(dist, data, n_elements, ref);    
+
+    printf("CPB: %d", FLOATS_PER_CHUNK);
+    find_distrution_from_data(dist, data2, 0, n_elements, ref);    
 
     for(size_t i = 0; i < DIST_SIZE; ++i) {
         if(i == 173) {
@@ -100,7 +114,7 @@ void tearDown(void) {
 
 int main() {
     UNITY_BEGIN();
-    omp_set_num_threads(0);
+    omp_set_num_threads(1);
     RUN_TEST(test_0_50_elem);
     RUN_TEST(test_20_random_elem);
 
