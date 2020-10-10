@@ -316,7 +316,7 @@ int find_distrution_in_file(char* file_name) {
         distribution, 
         chunks_to_process,
         0,
-        elements_to_process,
+        elements_to_process-1,
         trip);
     file_location -= 16;
     while(!end_of_file && read_block_from_file(
