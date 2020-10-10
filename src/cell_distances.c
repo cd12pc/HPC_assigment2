@@ -1,4 +1,5 @@
 
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
@@ -6,21 +7,35 @@
 #include <immintrin.h>
 #include <math.h>
 
-int read_block_from_file(char* file_name, 
+static inline int16_t getInt(char * string) {
+  char v = string[0];  
+
+  int16_t a;
+  a =  (string[1] - '0') * 10000;
+  a += (string[2] - '0') * 1000;
+  a += (string[4] - '0') * 100;
+  a += (string[5] - '0') * 10;
+  a += (string[6] - '0');
+  if(v == '-') 
+    return -a;
+  return a;
+}
+
+int read_first_block_from_file(
+    char* file_name, 
     long* file_location,
-    int num_floats, 
+    int16_t** chunks, 
+    int16_t * first, 
     int* elem_to_process, 
-    float* coords, 
     int* end_of_file) {
-  *end_of_file = 0;
-  
+
   FILE *fp = fopen(file_name, "r");
   if (fp == NULL) {
     printf("Error opening file (%s)\n", fp);
     exit(1);
   }
 
-//  printf("Moving to: %d\n", *file_location);
+  // Set location place
   fseek(fp, *file_location, SEEK_SET);
   if(feof(fp)) {
     *end_of_file = 1;
@@ -28,256 +43,314 @@ int read_block_from_file(char* file_name,
   }
   fseek(fp, -8, SEEK_CUR);
 
-  int index = 0;
-  while( fscanf(fp,"%f ", &coords[index]) != EOF && index < num_floats ) {
-    index++;
+  //Load character data
+  char* char_data = (char *) malloc(FLOATS_IN_MEMORY * sizeof(char));
+  size_t read = fread(char_data, sizeof(char), FLOATS_IN_MEMORY, fp);
+
+  first[0] = getInt(char_data);
+  first[1] = getInt(char_data + 8);
+  first[2] = getInt(char_data + 16);
+
+#pragma omp parallel for shared(chunks, char_data)
+  for(size_t i = 0; i < read/8; i++) {
+    int v = getInt(char_data + 8 * i + 24);
+    //  printf("%d %d %d %d\n", i, v, i % 3 + (i / 96), (i / 3) % FLOATS_PER_CHUNK);
+    chunks[i % 3 + 3 *(i  / 96)][(i / 3) % FLOATS_PER_CHUNK] = v;
   }
- 
+
+  *elem_to_process = read / (8 * 3);
   *file_location = ftell(fp);
-  if (feof(fp)) {
+
+  if(feof(fp)) {
     *end_of_file = 1;
-//    printf("EOF: %d\n", *file_location);
   }
   fclose(fp);
-  *elem_to_process = index / 3;
-  
+
+  free(char_data);
   return 1;
 }
 
+int read_block_from_file( 
+    char* file_name, 
+    long* file_location,
+    int16_t** chunks, 
+    int* elem_to_process, 
+    int* end_of_file) {
 
+  FILE *fp = fopen(file_name, "r");
+  if (fp == NULL) {
+    printf("Error opening file (%s)\n", fp);
+    exit(1);
+  }
 
+  // Set location place
+  fseek(fp, *file_location, SEEK_SET);
+  if(feof(fp)) {
+    *end_of_file = 1;
+    return 0;
+  }
+  fseek(fp, -8, SEEK_CUR);
 
-void find_16_distance_indices(size_t * result, float* base, float* input) {
+  //Load character data
+  char* char_data = (char *) malloc(FLOATS_IN_MEMORY * sizeof(char));
+  size_t read = fread(char_data, sizeof(char), FLOATS_IN_MEMORY, fp);
 
-#ifdef _DEBUG_BUILD_
-    __m512 _a, _a_off, _a2; // First index
-    __m512 _b, _b_off, _b2; // Second index
-    __m512 _c, _c_off, _c2; // Third index
-    __m512 _r, _r2, _r_t100; // Results
-    __m512i _index;
+#pragma omp parallel for shared(chunks, char_data)
+  for(size_t i = 0; i < read / 8; ++i) {
+    int v = getInt(char_data + 8 * i + 24);
+    // printf("%d %d %d %d\n", i, v, i % 3 + (i / (3 * FLOATS_PER_CHUNK)), (i / 3) % FLOATS_PER_CHUNK);
+    chunks[i % 3 + 3 * (i / 96)][(i / 3) % FLOATS_PER_CHUNK] = v;
+  }
 
-    const int32_t a_index_arg[16] = {0,3,6,9 ,12,15,18,21,24,27,30,33,36,39,42,45};
-    const int32_t b_index_arg[16] = {1,4,7,10,13,16,19,22,25,28,31,34,37,40,43,46};
-    const int32_t c_index_arg[16] = {2,5,8,11,14,17,20,23,26,29,32,35,38,41,44,47}; //Should go to 16*3 - 1 = 47
+  *elem_to_process = read / (8 * 3);
+  *file_location = ftell(fp);
 
-    __m512i _a_index = _mm512_load_epi64(a_index_arg);
-    __m512i _b_index = _mm512_load_epi64(b_index_arg);
-    __m512i _c_index = _mm512_load_epi64(c_index_arg); //Converting them to __m512 indicies
-
-    _a = _mm512_i32gather_ps(_a_index, input, sizeof(float)); //Loading data into a
-    _b = _mm512_i32gather_ps(_b_index, input, sizeof(float)); //Loading data into b
-    _c = _mm512_i32gather_ps(_c_index, input, sizeof(float)); //Loading data into c
-
-    _a_off = _mm512_set1_ps(base[0]); // a_off = the a coordinate of the other point
-    _b_off = _mm512_set1_ps(base[1]); // b_off = the b coordinate of the other point
-    _c_off = _mm512_set1_ps(base[2]); // c_off = the c coordinate of the other point
-    
-    //Actual computations start here 
-    _a = _mm512_sub_ps(_a, _a_off); // a = a - a_off
-    _b = _mm512_sub_ps(_b, _b_off); // b = b - b_off
-    _c = _mm512_sub_ps(_c, _c_off); // c = c - c_off
-
-    // Squaring
-    _a2 = _mm512_mul_ps(_a, _a); // a^2 = a * a
-    _b2 = _mm512_mul_ps(_b, _b); // b^2 = b * b
-    _c2 = _mm512_mul_ps(_c, _c); // c^2 = c * c
-
-    // Addition of squared
-    _r2 = _mm512_add_ps(_a2, _b2); //r^2 = a^2 + b^2
-    _r2 = _mm512_add_ps(_r2, _c2); //r^2 = c^2 + (a^2 + b^2)
-    // Square root
-    _r = _mm512_sqrt_ps(_r2); // r = sqrt(r^2)
-
-    //Multiplication of PRECISION and rounding to nearest int
-    _r_t100 = _mm512_mul_round_ps(_r, _mm512_set1_ps(PRECISION), _MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC );
-    //Converting to indicies
-    _index = _mm512_cvtps_epi32(_r_t100);
-    _mm512_storeu_epi32(result, _index); // Store data in results
-#else
-    float a_off = base[0];
-    float b_off = base[1];
-    float c_off = base[2];
-
-    for(size_t i = 0; i < 16; ++i) {
-        float a = input[3*i] - a_off;
-        float b = input[3*i + 1] - b_off;
-        float c = input[3*i + 2] - c_off;
-        //printf("r: %f\n",r);
-        result[i] = (size_t) roundf(PRECISION*sqrtf(a*a + b*b + c*c));
-
-    }
-
-#endif
-
-
+  if(feof(fp)) {
+    *end_of_file = 1;
+  }
+  fclose(fp);
+  free(char_data);
+  return 1;
 }
 
+void find_32_distance_indices(int16_t * result, int16_t* base, int16_t* a, int16_t * b, int16_t* c) {
 
+  __m512i _a, _a_off, _a_u, _a_l; // First index
+  __m512i _b, _b_off, _b_u, _b_l; // Second index
+  __m512i _c, _c_off, _c_u, _c_l; // Third index
+  __m512i _r2_l, _r2_u, _r_l, _r_u, _r;
+  __m512 _r_lf, _r_uf;
+
+  _a = _mm512_loadu_si512(a); //This is 16 bit memory. Yes it is!!!
+  _b = _mm512_loadu_si512(b); //It just loads in memory...
+  _c = _mm512_loadu_si512(c); //It is still 16 bit. 16 BIT
+
+  _a_off = _mm512_set1_epi16(base[0]); // a_off = the a coordinate of the other point
+  _b_off = _mm512_set1_epi16(base[1]); // a_off = the a coordinate of the other point
+  _c_off = _mm512_set1_epi16(base[2]); // a_off = the a coordinate of the other point
+
+
+
+  _a = _mm512_sub_epi16(_a, _a_off); // a = a - a_off
+  _b = _mm512_sub_epi16(_b, _b_off); // a = a - a_off
+  _c = _mm512_sub_epi16(_c, _c_off); // a = a - a_off
+
+  _a = _mm512_abs_epi16(_a);
+  _b = _mm512_abs_epi16(_b);
+  _c = _mm512_abs_epi16(_c);
+
+  // Divide the 16 bit int into two
+  _a_l = _mm512_unpacklo_epi16(_a, _mm512_set1_epi16(0));
+  _b_l = _mm512_unpacklo_epi16(_b, _mm512_set1_epi16(0));
+  _c_l = _mm512_unpacklo_epi16(_c, _mm512_set1_epi16(0));
+
+  _a_u = _mm512_unpackhi_epi16(_a, _mm512_set1_epi16(0));
+  _b_u = _mm512_unpackhi_epi16(_b, _mm512_set1_epi16(0));
+  _c_u = _mm512_unpackhi_epi16(_c, _mm512_set1_epi16(0));
+
+
+  _a_l = _mm512_mullo_epi32(_a_l, _a_l); // a * a
+  _a_u = _mm512_mullo_epi32(_a_u, _a_u);    
+
+  _b_l = _mm512_mullo_epi32(_b_l, _b_l); // b * b
+  _b_u = _mm512_mullo_epi32(_b_u, _b_u);
+
+  _c_l = _mm512_mullo_epi32(_c_l, _c_l); // c * c
+  _c_u = _mm512_mullo_epi32(_c_u, _c_u);
+
+  _r2_l = _mm512_add_epi32(_a_l, _b_l); // r^2 = a*a + b*b
+  _r2_u = _mm512_add_epi32(_a_u, _b_u);
+
+  _r2_l = _mm512_add_epi32(_r2_l, _c_l); // r^2 = (a*a + b*b) + c*c
+  _r2_u = _mm512_add_epi32(_r2_u, _c_u);
+
+  _r_lf = _mm512_sqrt_ps(_mm512_cvtepi32_ps(_r2_l)); //
+  _r_uf = _mm512_sqrt_ps(_mm512_cvtepi32_ps(_r2_u));
+
+  _r_lf = _mm512_mul_round_ps(_r_lf, 
+      _mm512_set1_ps(0.1), 
+      _MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC );
+  _r_uf = _mm512_mul_round_ps(_r_uf, 
+      _mm512_set1_ps(0.1), 
+      _MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC );
+
+  _r_l =_mm512_cvtps_epi32(_r_lf);
+  _r_u =_mm512_cvtps_epi32(_r_uf);
+  //_mm512_storeu_epi32(result, ;// Store data in results
+  //_mm512_storeu_epi32(result, _a_l);// Store data in results
+  _r = _mm512_packus_epi32(_r_l, _r_u);
+  //_mm512_storeu_epi32(result, _r);
+
+  _mm512_storeu_epi32(result, _r);
+  //_r_uf = _mm512_mul_round_ps(_r_uf, 
+  //    _§mm512_set1_ps(PRECISION), 
+  //    _MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC );
+
+
+  //_mm512_storeu_epi32(result+16, _mm512_cvtps_epi32(_r_uf));// Store data in results
+}
 
 void find_distrution_from_data(
-        uint64_t * distribution, 
-        float* data_to_process,
-        int elements_to_process,
-        float* trip)
+    uint64_t * distribution, 
+    int16_t ** chunks_to_process,
+    int start_elem,
+    int end_elem,
+    int16_t* trip)
 {
 
-    int blocks_to_process = elements_to_process / ELEM_PER_BLOCK; 
+  size_t start_block = start_elem / FLOATS_PER_CHUNK;
+  size_t start_elem_in_block = start_elem % FLOATS_PER_CHUNK;
+  size_t end_block = end_elem / FLOATS_PER_CHUNK; 
+  size_t ev = end_block + 1;
+  //printf("DISTZISE: %d\n", DIST_SIZE);
+  int16_t indicies[32] = {0, 0, 0, 0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-    size_t indicies[16] = {0, 0, 0, 0,0,0,0,0,0,0,0,0,0,0,0,0};
-    //OLD:
-    // #pragma omp parallel for reduction(+:distribution[:]) shared(trip, elements_to_process) private(indicies) 
-    #pragma omp parallel for shared(trip, elements_to_process) private(indicies) 
-    for(size_t i_block = 0; i_block < blocks_to_process; ++i_block) {
+#pragma omp parallel for shared(trip, chunks_to_process, start_block, end_block, distribution) private(indicies)
+  for(int i_block = start_block; i_block < ev; i_block++) {
+    int loc = 3 * i_block;
+    //printf("(1)%d %d\n", i_block, loc);
+    /*
+       for(int i = 0; i < 32; ++i) {
+       printf("[%d][%d]   %d - %d| %d - %d | %d - %d \n", 
+       3*i_block, i, 
+       chunks_to_process[3*i_block][i], trip[0],
+       chunks_to_process[3*i_block + 1][i], trip[1],
+       chunks_to_process[3*i_block + 2][i], trip[2]);
+       }
+       */
+    find_32_distance_indices(
+        indicies,
+        trip,
+        *(chunks_to_process + loc),
+        *(chunks_to_process + loc+1),
+        *(chunks_to_process + loc+2));
 
-        find_16_distance_indices(
-                indicies,
-                trip, 
-                data_to_process + FLOATS_PER_BLOCK*i_block); 
+    //  printf("(2)%d\n", i_block);
 
-        #pragma omp atomic
-        distribution[indicies[0]]++;
-        #pragma omp atomic
-        distribution[indicies[1]]++;
-        #pragma omp atomic
-        distribution[indicies[2]]++;
-        #pragma omp atomic
-        distribution[indicies[3]]++;
-        #pragma omp atomic
-        distribution[indicies[4]]++;
-        #pragma omp atomic
-        distribution[indicies[5]]++;
-        #pragma omp atomic
-        distribution[indicies[6]]++;
-        #pragma omp atomic
-        distribution[indicies[7]]++;
-        #pragma omp atomic
-        distribution[indicies[8]]++;
-        #pragma omp atomic
-        distribution[indicies[9]]++;
-        #pragma omp atomic
-        distribution[indicies[10]]++;
-        #pragma omp atomic
-        distribution[indicies[11]]++;
-        #pragma omp atomic
-        distribution[indicies[12]]++;
-        #pragma omp atomic
-        distribution[indicies[13]]++;
-        #pragma omp atomic
-        distribution[indicies[14]]++;
-        #pragma omp atomic
-        distribution[indicies[15]]++;
+
+    //printf("(3)%d\n", i_block);
+    int start = (start_block == i_block) * start_elem % FLOATS_PER_CHUNK; 
+    int end;
+    if(end_block == i_block) {
+      end = end_elem % FLOATS_PER_CHUNK;
+    } else {
+      end = FLOATS_PER_CHUNK;
     }
-    int rem = elements_to_process % ELEM_PER_BLOCK;
 
-    float stack_data[FLOATS_PER_BLOCK];
-    
-    for(size_t i = 0; i < rem; ++i) {
-        stack_data[3*i] 
-          = data_to_process[3*(elements_to_process - rem + i)];
-        stack_data[3*i + 1] 
-          = data_to_process[3*(elements_to_process - rem + i) +1];
-        stack_data[3*i + 2] 
-          = data_to_process[3*(elements_to_process - rem + i) +2];
+    /*        for(int i = start; i < end; ++i) {
+              printf("[%d][%d]   %d - %d| %d - %d | %d - %d = %d \n", 
+              3*i_block, i, 
+              chunks_to_process[3*i_block][i], trip[0],
+              chunks_to_process[3*i_block + 1][i], trip[1],
+              chunks_to_process[3*i_block + 2][i], trip[2],
+              indicies[i]);
+              }*/
+    for(int i = start; i < end; ++i) {
+      /*          printf("[%d][%d]   %d - %d| %d - %d | %d - %d = %d \n", 
+                  3*i_block, i, 
+                  chunks_to_process[3*i_block][i], trip[0],
+                  chunks_to_process[3*i_block + 1][i], trip[1],
+                  chunks_to_process[3*i_block + 2][i], trip[2],
+                  indicies[i]);*/
+#pragma omp atomic
+    distribution[indicies[i]]++;
     }
-    
-    find_16_distance_indices(
-        indicies, 
-        trip, 
-        stack_data);
-
-    for(size_t i = 0; i < rem; ++i) {
-        distribution[indicies[i]]++;
-    }
+  }
 }
 
 
- int find_distrution_in_file(char* file_name) {
-    long start_location = 0;
-    long file_location = 0;
+int find_distrution_in_file(char* file_name) {
+  long start_location = 0;
+  long file_location = 0;
 
-    uint64_t* distribution = (uint64_t*) calloc(DIST_SIZE, sizeof(uint64_t));
+  uint64_t* distribution = (uint64_t*) calloc(DIST_SIZE, sizeof(uint64_t));
 
-    float trip[3] = {0., 0., 0.};
-    int elements_to_process = 0;
-    int end_of_file = 0;
-    float* data_to_process = (float *) malloc(FLOATS_IN_MEMORY * sizeof(float));
+  int16_t trip[3] = {0, 0, 0};
+  int elements_to_process = 0;
+  int end_of_file = 0;
+  int16_t* data_to_process = (int16_t *) malloc(FLOATS_IN_MEMORY * sizeof(int16_t));
 
+  int16_t** chunks_to_process = (int16_t **) malloc(CHUNKS_IN_MEMORY * sizeof(int16_t *));
+  for(int i = 0; i < CHUNKS_IN_MEMORY; ++i) {
+    chunks_to_process[i] = data_to_process + i * FLOATS_PER_CHUNK;
+  }
 
-    while(read_block_from_file(
+  while(read_first_block_from_file(
         file_name,
         &file_location,
-		FLOATS_IN_MEMORY,
-		&elements_to_process,
-        data_to_process,
+        chunks_to_process,
+        trip,
+        &elements_to_process,
         &end_of_file)) {
 
-/*      for(int i = 0; i < ELEM_PER_BLOCK+1; i++) {
-          printf("(1) %d = %f | %f | %f\n", i,
-              data_to_process[3*i], 
-              data_to_process[3*i + 1], 
-              data_to_process[3*i + 2]);
+    /*for(int i = 0; i < ELEM_PER_BLOCK+1; i++) {
+      printf("(1) %d = %f | %f | %f\n", i,
+      data_to_process[3*i], 
+      data_to_process[3*i + 1], 
+      data_to_process[3*i + 2]);
+      }*/
+
+    //printf("1: sl %d\n", start_location);
+    //printf("1 : fl %d\n", file_location);
+    if(end_of_file) {
+      for(int ie = 0; ie < elements_to_process; ++ ie) {
+        find_distrution_from_data(
+            distribution, 
+            chunks_to_process,
+            ie,
+            elements_to_process-1,
+            trip);
+
+        int block = ie / FLOATS_PER_CHUNK;
+        int loc = ie % FLOATS_PER_CHUNK;
+        trip[0] = chunks_to_process[3*block][loc];
+        trip[1] = chunks_to_process[3*block + 1][loc];
+        trip[2] = chunks_to_process[3*block + 2][loc];
       }
-*/
-      //printf("1: sl %d\n", start_location);
-      //printf("1 : fl %d\n", file_location);
-      if(end_of_file) {
-        for(int ie = 0; ie < elements_to_process; ++ ie) {
-          trip[0] = data_to_process[3*ie];
-          trip[1] = data_to_process[3*ie+1];
-          trip[2] = data_to_process[3*ie+2];
+      break;
+    }
 
-          find_distrution_from_data(
-              distribution, 
-              data_to_process+3*(1+ie),
-              elements_to_process-(1+ie),
-              trip);
-        }
-        break;
-      }
+    find_distrution_from_data(
+        distribution, 
+        chunks_to_process,
+        0,
+        elements_to_process,
+        trip);
 
-      trip[0] = data_to_process[0];
-      trip[1] = data_to_process[1];
-      trip[2] = data_to_process[2];
-
-      find_distrution_from_data(
-          distribution, 
-          data_to_process+3,
-          elements_to_process-1,
-          trip);
-
-      while(!end_of_file && read_block_from_file(
+    while(!end_of_file && read_block_from_file(
           file_name,
           &file_location,
-          FLOATS_IN_MEMORY,
+          chunks_to_process,
           &elements_to_process,
-          data_to_process,
           &end_of_file)) {
 
       /*
-      for(int i = 0; i < ELEM_PER_BLOCK+1; i++) {
-          printf("(2) %d = %f | %f | %f\n", i,
-              data_to_process[3*i], 
-              data_to_process[3*i + 1], 
-              data_to_process[3*i + 2]);
-      }*/
+         for(int i = 0; i < ELEM_PER_BLOCK+1; i++) {
+         printf("(2) %d = %f | %f | %f\n", i,
+         data_to_process[3*i], 
+         data_to_process[3*i + 1], 
+         data_to_process[3*i + 2]);
+         }*/
       //printf("2 : fl %d\n", file_location);
       //printf("2 : eof %d\n", end_of_file);
-        find_distrution_from_data(
+      find_distrution_from_data(
           distribution, 
-          data_to_process,
+          chunks_to_process,
+          0,
           elements_to_process,
           trip);
-      }
-      start_location++;
-      file_location = 24 * start_location + 8;
     }
+    start_location++;
+    file_location = 24 * start_location + 8;
+  }
 
-    float distance, freq;
-    for(int i = 0; i < DIST_SIZE; ++i) {
+  float distance, freq;
+  for(int i = 0; i < DIST_SIZE; ++i) {
+    if(distribution[i] > 0) {
       distance = i / 100.f;
-      if(distribution[i] > 0) 
-            printf("%.2f %d\n", distance, distribution[i]);
-    }
+      printf("%.2f %d\n", distance, distribution[i]);
+    } 
+  }
 
-    return 1;
+  return 0;
 }

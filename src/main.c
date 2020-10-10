@@ -62,4 +62,6 @@ int main(int argc, char *argv[]) {
     {
         printf("The file \"%s\" does not exists\n", file_name);
     }
+
+    return -1; 
 }

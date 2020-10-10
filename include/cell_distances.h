@@ -11,26 +11,28 @@ extern "C" {
 static const int SPACE_WIDTH = 20;
 static const int PRECISION = 100;
 
-static const int DIST_SIZE = (int) PRECISION*(sqrt(3) * SPACE_WIDTH) + 10; // Has to be larger than sqrt(3) * 20 * precision (In the task = 3464)
-
-static const int NUM_BLOCKS = 100000;
-static const int ELEM_PER_BLOCK = 16;
-static const int FLOATS_PER_ELEM = 3;
-static const int FLOATS_PER_BLOCK = FLOATS_PER_ELEM * ELEM_PER_BLOCK;
+static const int32_t DIST_SIZE = (int32_t) 1000*(sqrt(3) * SPACE_WIDTH) + 10; // Has to be larger than sqrt(3) * 20 * precision (In the task = 3464)
 
 
-static const int ELEM_IN_MEMORY = NUM_BLOCKS * ELEM_PER_BLOCK + 1;
-static const int FLOATS_IN_MEMORY = ELEM_IN_MEMORY * FLOATS_PER_ELEM;
 
-void find_16_distance_indices(size_t * result, float* base, float* input);
+static const int NUM_BLOCKS = 100; //Slower with 1000
+static const int CHUNKS_PER_BLOCK = 3;
+static const int FLOATS_PER_CHUNK = 32;
+
+static const int CHUNKS_IN_MEMORY = NUM_BLOCKS * CHUNKS_PER_BLOCK;
+static const int FLOATS_IN_MEMORY = CHUNKS_IN_MEMORY * FLOATS_PER_CHUNK;
+
+
+void find_32_distance_indices(int16_t * result, int16_t* base, int16_t* a, int16_t * b, int16_t* c);
 
 int find_distrution_in_file(char* file_name);
 
 void find_distrution_from_data(
-        uint64_t* distribution, 
-        float* data_to_process,
-        int elements_to_process,
-        float* trip);
+        uint64_t * distribution, 
+        int16_t ** chunks_to_process,
+        int start_elem,
+        int end_elem,
+        int16_t* trip);
 
 #ifdef __cplusplus
 }
