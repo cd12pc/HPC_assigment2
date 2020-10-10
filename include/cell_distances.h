@@ -15,7 +15,7 @@ static const int32_t DIST_SIZE = (int32_t) 1000*(sqrt(3) * SPACE_WIDTH) + 10; //
 
 
 
-static const int NUM_BLOCKS = 100; //Slower with 1000
+static const int NUM_BLOCKS = 5000; //Slower with 1000
 static const int CHUNKS_PER_BLOCK = 3;
 static const int FLOATS_PER_CHUNK = 32;
 

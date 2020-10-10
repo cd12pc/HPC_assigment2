@@ -1,4 +1,3 @@
-
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +34,8 @@ int read_first_block_from_file(
     exit(1);
   }
 
+  *end_of_file = 0;
+
   // Set location place
   fseek(fp, *file_location, SEEK_SET);
   if(feof(fp)) {
@@ -52,7 +53,7 @@ int read_first_block_from_file(
   first[2] = getInt(char_data + 16);
 
 #pragma omp parallel for shared(chunks, char_data)
-  for(size_t i = 0; i < read/8; i++) {
+  for(size_t i = 0; i < read/8 - 1; i++) {
     int v = getInt(char_data + 8 * i + 24);
     //  printf("%d %d %d %d\n", i, v, i % 3 + (i / 96), (i / 3) % FLOATS_PER_CHUNK);
     chunks[i % 3 + 3 *(i  / 96)][(i / 3) % FLOATS_PER_CHUNK] = v;
@@ -65,7 +66,6 @@ int read_first_block_from_file(
     *end_of_file = 1;
   }
   fclose(fp);
-
   free(char_data);
   return 1;
 }
@@ -83,13 +83,15 @@ int read_block_from_file(
     exit(1);
   }
 
+  *end_of_file = 0;
+
   // Set location place
   fseek(fp, *file_location, SEEK_SET);
   if(feof(fp)) {
     *end_of_file = 1;
     return 0;
   }
-  fseek(fp, -8, SEEK_CUR);
+  //fseek(fp, -8, SEEK_CUR);
 
   //Load character data
   char* char_data = (char *) malloc(FLOATS_IN_MEMORY * sizeof(char));
@@ -97,7 +99,7 @@ int read_block_from_file(
 
 #pragma omp parallel for shared(chunks, char_data)
   for(size_t i = 0; i < read / 8; ++i) {
-    int v = getInt(char_data + 8 * i + 24);
+    int v = getInt(char_data + 8 * i);
     // printf("%d %d %d %d\n", i, v, i % 3 + (i / (3 * FLOATS_PER_CHUNK)), (i / 3) % FLOATS_PER_CHUNK);
     chunks[i % 3 + 3 * (i / 96)][(i / 3) % FLOATS_PER_CHUNK] = v;
   }
@@ -114,6 +116,7 @@ int read_block_from_file(
 }
 
 void find_32_distance_indices(int16_t * result, int16_t* base, int16_t* a, int16_t * b, int16_t* c) {
+
 
   __m512i _a, _a_off, _a_u, _a_l; // First index
   __m512i _b, _b_off, _b_u, _b_l; // Second index
@@ -282,13 +285,14 @@ int find_distrution_in_file(char* file_name) {
         trip,
         &elements_to_process,
         &end_of_file)) {
-
-    /*for(int i = 0; i < ELEM_PER_BLOCK+1; i++) {
-      printf("(1) %d = %f | %f | %f\n", i,
-      data_to_process[3*i], 
-      data_to_process[3*i + 1], 
-      data_to_process[3*i + 2]);
-      }*/
+    // printf("(1) %i = %i | %i | %i\n",0,trip[0], trip[1],trip[2]);  
+    // for(int i = 0; i < elements_to_process-1; i++) {
+    //   printf("(1) %i = %i | %i | %i\n", i+1,
+    //   chunks_to_process[0][i], 
+    //   chunks_to_process[1][i], 
+    //   chunks_to_process[2][i]);
+    // }
+    // printf("(1) eof: %i\n", end_of_file);
 
     //printf("1: sl %d\n", start_location);
     //printf("1 : fl %d\n", file_location);
@@ -314,9 +318,9 @@ int find_distrution_in_file(char* file_name) {
         distribution, 
         chunks_to_process,
         0,
-        elements_to_process,
+        elements_to_process-1,
         trip);
-
+    //file_location += 8;
     while(!end_of_file && read_block_from_file(
           file_name,
           &file_location,
@@ -333,6 +337,13 @@ int find_distrution_in_file(char* file_name) {
          }*/
       //printf("2 : fl %d\n", file_location);
       //printf("2 : eof %d\n", end_of_file);
+  //    for(int i = 0; i < elements_to_process; i++) {
+	// printf("(2) %i = %i | %i | %i\n", i,
+	// 	  chunks_to_process[0][i],
+	// 	  chunks_to_process[1][i],
+	// 	  chunks_to_process[2][i]);
+  //     }
+  //     printf("(2) eof: %i\n", end_of_file);  
       find_distrution_from_data(
           distribution, 
           chunks_to_process,
@@ -351,6 +362,5 @@ int find_distrution_in_file(char* file_name) {
       printf("%.2f %d\n", distance, distribution[i]);
     } 
   }
-
   return 0;
 }
