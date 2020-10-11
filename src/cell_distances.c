@@ -53,10 +53,9 @@ int read_first_block_from_file(
 
   int endValue = read/8-1;
   int increm = endValue / omp_get_max_threads();
-#pragma omp parallel for shared(chunks, char_data)
+#pragma omp parallel for shared(chunks, char_data, FLOATS_PER_CHUNK)
   for(size_t j = 0; j < endValue; j += increm) {
     for(size_t i = j; i < j + increm; i++) {
-
       chunks[i % 3 + 3 *(i  / 96)][(i / 3) % FLOATS_PER_CHUNK] 
         = getInt(char_data + 8 * i + 24);
     }
@@ -107,6 +106,7 @@ int read_block_from_file(
   for(size_t i = 0; i < read / 8; ++i) {
     int v = getInt(char_data + 8 * i);
     // printf("%d %d %d %d\n", i, v, i % 3 + (i / (3 * FLOATS_PER_CHUNK)), (i / 3) % FLOATS_PER_CHUNK);
+#pragma atomic
     chunks[i % 3 + 3 * (i / 96)][(i / 3) % FLOATS_PER_CHUNK] = v;
   }
 
@@ -222,7 +222,6 @@ void find_distrution_from_data(
 
   size_t end_block = end_elem / FLOATS_PER_CHUNK; 
   size_t ev = end_block;
-  //printf("DISTZISE: %d\n", DIST_SIZE);
   int16_t indicies[] = {
     0,0,0,0,
     0,0,0,0,
@@ -234,7 +233,12 @@ void find_distrution_from_data(
     0,0,0,0
   };
 
-#pragma omp parallel for private(indicies)
+  #pragma omp parallel private(indicies) reduction(+:distribution[:DIST_SIZE])
+  {
+
+  //printf("DISTZISE: %d\n", DIST_SIZE);
+
+#pragma omp for
   for(int i_block = 0; i_block < ev; i_block++) {
 
     find_32_distance_indices(
@@ -245,11 +249,10 @@ void find_distrution_from_data(
         *(chunks_to_process + 3*i_block+2));
 
     for(int i = 0; i < 32; ++i) {
-#pragma omp atomic
       distribution[indicies[i]]++;
     }
   }
-
+  } 
 
   find_32_distance_indices(
       indicies,
@@ -262,6 +265,7 @@ void find_distrution_from_data(
   for(int i = 0; i < rem; ++i){
     distribution[indicies[i]]++;
   }
+  
 }
 
 
@@ -276,11 +280,16 @@ void find_distrution_from_data_start(
 
 
 
-  size_t start_block = start_elem / FLOATS_PER_CHUNK;
-  size_t start_elem_in_block = start_elem % FLOATS_PER_CHUNK;
-  size_t end_block = end_elem / FLOATS_PER_CHUNK; 
-  size_t ev = end_block + 1;
   //printf("DISTZISE: %d\n", DIST_SIZE);
+  
+//#pragma omp parallel reduction(+:distribution[:DIST_SIZE])
+  {
+    size_t start_block = start_elem / FLOATS_PER_CHUNK;
+    size_t start_elem_in_block = start_elem % FLOATS_PER_CHUNK;
+    size_t end_block = end_elem / FLOATS_PER_CHUNK; 
+    size_t ev = end_block + 1;
+    int increm = 1 + (end_block - start_block) / omp_get_max_threads();
+
   int16_t indicies[] = {
     0,0,0,0,
     0,0,0,0,
@@ -292,22 +301,11 @@ void find_distrution_from_data_start(
     0,0,0,0
   };
 
-  int increm = 1 + (end_block - start_block) / omp_get_max_threads();
-
-#pragma omp parallel for private(indicies)
+//#pragma omp for
   for(int j_block = start_block; j_block < ev; j_block += increm) {
     for(int i_block = j_block; i_block < j_block + increm & i_block < ev; i_block++) {
       int loc = 3 * i_block;
-      //printf("(1)%d %d\n", i_block, loc);
-      /*
-         for(int i = 0; i < 32; ++i) {
-         printf("[%d][%d]   %d - %d| %d - %d | %d - %d \n", 
-         3*i_block, i, 
-         chunks_to_process[3*i_block][i], trip[0],
-         chunks_to_process[3*i_block + 1][i], trip[1],
-         chunks_to_process[3*i_block + 2][i], trip[2]);
-         }
-         */
+      
       find_32_distance_indices(
           indicies,
           trip,
@@ -315,10 +313,6 @@ void find_distrution_from_data_start(
           *(chunks_to_process + 3 * i_block + 1),
           *(chunks_to_process + 3 * i_block + 2));
 
-      //  printf("(2)%d\n", i_block);
-
-
-      //printf("(3)%d\n", i_block);
       int start = (start_block == i_block) * start_elem % FLOATS_PER_CHUNK; 
       int end = 0;
       if(end_block != i_block) {
@@ -327,32 +321,13 @@ void find_distrution_from_data_start(
         end = end_elem % FLOATS_PER_CHUNK;
       }
 
-      /*
-         for(int i = start; i < end; ++i) {
-         printf("[%d][%d]   %d - %d| %d - %d | %d - %d = %d \n", 
-         3*i_block, i, 
-         chunks_to_process[3*i_block][i], trip[0],
-         chunks_to_process[3*i_block + 1][i], trip[1],
-         chunks_to_process[3*i_block + 2][i], trip[2],
-         indicies[i]);
-         }
-         */
       for(int i = start; i < end; ++i) {
-        /*
-           printf("[%d][%d]   %d - %d| %d - %d | %d - %d = %d \n", 
-           3*i_block, i, 
-           chunks_to_process[3*i_block][i], trip[0],
-           chunks_to_process[3*i_block + 1][i], trip[1],
-           chunks_to_process[3*i_block + 2][i], trip[2],
-           indicies[i]);
-           */
-#pragma omp atomic
         distribution[indicies[i]]++;
       }
     }
 
   }
-}
+}}
 
 
 
@@ -371,6 +346,8 @@ int find_distrution_in_file(char* file_name) {
   for(int i = 0; i < CHUNKS_IN_MEMORY; ++i) {
     chunks_to_process[i] = data_to_process + (i * FLOATS_PER_CHUNK);
   }
+
+
 
   while(read_first_block_from_file(
         file_name,
@@ -392,6 +369,7 @@ int find_distrution_in_file(char* file_name) {
     //printf("1: sl %d\n", start_location);
     //printf("1 : fl %d\n", file_location);
     if(end_of_file) {
+#pragma omp parrallel for private(trip) reduction(+:distribution[:DIST_SIZE]) 
       for(int ie = 0; ie < elements_to_process; ++ ie) {
         find_distrution_from_data_start(
             distribution, 
