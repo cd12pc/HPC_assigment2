@@ -6,9 +6,9 @@
 #include <cell_distances.h>
 
 int main(int argc, char *argv[]) {
-    char* file_name;
-    int n_threads;
-    size_t t_index;
+    char* file_name = "./cell";
+    int n_threads = 1;
+    size_t t_index = 0;
     if(argc == 2)
     {
         if(strncmp(argv[1], "-t", 2) != 0)
@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     }
     else if(argc == 3)
     {
-        size_t file_index;
+        size_t file_index = 0;
         if(strncmp(argv[1], "-t", 2) == 0)
         {
             t_index = 1;

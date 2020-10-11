@@ -44,7 +44,7 @@ RDIR := ./results
 ###########################
 
 #Libaries
-LIBS := -lm
+LIBS := -lm -lgomp
 #Benchamrking Libaries
 BENCH_LIBS = -lstdc++
 
@@ -62,7 +62,7 @@ CPPFLAGS := $(CFLAGS)
 DEBUG_FLAGS = -g
 
 # PROFILING FLAGS (Turned off by defualt)
-PROF_FLAGS:= -g -pg
+PROF_FLAGS:= -g3 -pg
 
 
 # Normal Optimiztion Flags
@@ -101,7 +101,7 @@ D_MAIN := $(patsubst %.o,$(ODIR)/%.d.o,$(_MAIN))
 P_MAIN := $(patsubst %.o,$(ODIR)/%.p.o,$(_MAIN))
 
 
-_BENCHMARK_FILES:= benchmark.o
+_BENCHMARK_FILES:= run.o
 B_R_FILES := $(patsubst %.o,$(BB_DIR)/%.a,$(notdir $(_BENCHMARK_FILES)))
 DB_R_FILES := $(patsubst %.o,$(BB_DIR)/%.d.a,$(notdir $(_BENCHMARK_FILES)))
 PB_R_FILES := $(patsubst %.o,$(BB_DIR)/%.p.a,$(notdir $(_BENCHMARK_FILES)))
@@ -569,7 +569,7 @@ $$(TO_DIR)/$(1)/%.p.o: $$(TS_DIR)/%.c $$(DEPS) $$(TEST_DEPS) | $$(FOLDER)
 
 $$($(1)PT_R_FILES): $(TO_DIR)/$$(BASENAME).o $$($(1)P_OBJS) | $$(FOLDER)
 	@echo "++ Linking $$@"
-	@$(strip $(CC) $$($(1)FLAGS) $(PROF_FLAGS) $(T_FLAGS) -o $$@ $$^ $(T_LIBS))
+	@$(strip $(CC) $$($(1)FLAGS) $$(PROF_FLAGS) $$(T_FLAGS) -o $$@ $$^ $(T_LIBS))
 
 
 
