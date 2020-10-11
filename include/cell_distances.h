@@ -17,6 +17,10 @@ static const int32_t DIST_SIZE = (int32_t) 1000*(sqrt(3) * SPACE_WIDTH) + 10; //
 static const int NUM_BLOCKS = 3000; //Slower with 1000
 static const int CHUNKS_PER_BLOCK = 3;
 static const int FLOATS_PER_CHUNK = 32;
+static const int BYTES_PER_ELEM = 24;
+
+
+static const int ELEM_IN_MEMORY = NUM_BLOCKS * FLOATS_PER_CHUNK;
 
 static const int CHUNKS_IN_MEMORY = NUM_BLOCKS * CHUNKS_PER_BLOCK;
 static const int FLOATS_IN_MEMORY = CHUNKS_IN_MEMORY * FLOATS_PER_CHUNK;
