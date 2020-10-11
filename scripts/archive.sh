@@ -13,12 +13,12 @@ popd  > /dev/null
 BASE_DIR_ABS="$(dirname ${SCRIPT_PATH})"
 BASE_DIR="$(realpath --relative-to="${PWD}"  $BASE_DIR_ABS)"
 
-
-
-FILES=("makefile" "README.md" ".gitignore" "run.sh")
-FOLDERS=("src" "saved" "include" "scripts")
+FILES=("makefile" "src/main.c" "src/cell_distances.c" "include/cell_distances.h")
+FOLDERS=()
 
 echo ${FOLDERS}
+
+
 
 OUT_FILE=$(pwd)/$1
 pushd $BASE_DIR > /dev/null

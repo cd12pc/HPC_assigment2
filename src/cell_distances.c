@@ -428,7 +428,7 @@ int find_distrution_in_file(char* file_name) {
     
     for(int i = 0; i < DIST_SIZE; ++i) {
         if(distribution[i] != 0)
-        printf("%.2f %d\n", i / 100.f, distribution[i]); 
+        printf("%05.2f %d\n", i / 100.f, distribution[i]); 
     }
     free(distribution);
 

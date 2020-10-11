@@ -101,7 +101,7 @@ D_MAIN := $(patsubst %.o,$(ODIR)/%.d.o,$(_MAIN))
 P_MAIN := $(patsubst %.o,$(ODIR)/%.p.o,$(_MAIN))
 
 
-_BENCHMARK_FILES:= run.o
+_BENCHMARK_FILES:= 
 B_R_FILES := $(patsubst %.o,$(BB_DIR)/%.a,$(notdir $(_BENCHMARK_FILES)))
 DB_R_FILES := $(patsubst %.o,$(BB_DIR)/%.d.a,$(notdir $(_BENCHMARK_FILES)))
 PB_R_FILES := $(patsubst %.o,$(BB_DIR)/%.p.a,$(notdir $(_BENCHMARK_FILES)))
@@ -299,13 +299,12 @@ $(B_R_FILES): $(OBJS) $(BO_DIR)/$$(basename $$(@F)).o | $(RDIR)/. $$(@D)/.
 	@echo "++ Linking $@"
 	$(strip $(CC) $(OPTFLAGS) $(B_FLAGS) -o $@ $^ $(B_LIBS))
 
-.PHONY: _start _basic _end
+.PHONY: _start _basic _basic_no_test _end
 _basic: _start $(BDIR)/$(EXE).a $(B_R_FILES) $(A_FILES) _t_basic _end
 _start:
 	@echo "========= Building Base ========="
 _end:
 	@echo "========= Finsihed Base ========="
-
 
 
 #############################################
@@ -606,12 +605,12 @@ $(eval $(call FLAG_SET,ogn,-Og -march=native))
 ###############################
 ######## general rules ########
 ###############################
-cell_distances : _basic
+cell_distances: $(BDIR)/$(EXE).a 
 	@echo copying main file
 	@cp $(BDIR)/$(EXE).a cell_distances 
 
 .PHONY: base base_test project all
-base: _basic cell_distances
+base: cell_distances
 project: o0 o2 o2n
 all: _basic oall
 
@@ -646,7 +645,7 @@ everything: all debug-all prof-all
 ###############################################
 
 .PHONY: clean clean_obj clean_asm clean_bin clean-results clean-all
-clean: clean_obj clean_asm clean_bin
+clean: clean_obj clean_asm clean_bin clean-folders
 
 clean_obj:
 	@echo "---- Cleaning Objects"
@@ -667,6 +666,8 @@ clean_bin:
 	@rm -f $(BDIR)/*.a $(BDIR)/*/*.a 
 	@echo "---- Cleaning Test Binaries"
 	@rm -f $(TB_DIR)/*.a $(TB_DIR)/*/*.a 
+	@echo "---- Cleaing cell_distances"
+	@rm -f cell_distances
 
 clean-results:
 	@echo "---- Cleaning Results"

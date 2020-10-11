@@ -6,7 +6,7 @@
 #include <cell_distances.h>
 
 int main(int argc, char *argv[]) {
-    char* file_name = "./cell";
+    char* file_name = "./cells";
     int n_threads = 1;
     size_t t_index = 0;
     if(argc == 2)
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
             return -1;
         }
         t_index = 1;
-        file_name = "./cell";
+        file_name = "./cells";
     }
     else if(argc == 3)
     {
