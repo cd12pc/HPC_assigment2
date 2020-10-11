@@ -606,10 +606,12 @@ $(eval $(call FLAG_SET,ogn,-Og -march=native))
 ###############################
 ######## general rules ########
 ###############################
-
+cell_distances : _basic
+	@echo copying main file
+	@cp $(BDIR)/$(EXE).a cell_distances 
 
 .PHONY: base base_test project all
-base: _basic
+base: _basic cell_distances
 project: o0 o2 o2n
 all: _basic oall
 

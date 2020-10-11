@@ -129,15 +129,15 @@ static inline void find_32_distance_indices(
         int16_t * result, 
         int16_t* base, 
         int16_t* a, int16_t * b, int16_t* c) {
-    ///*
+    /*
     for(int i = 0; i < 32; ++i) {
         uint32_t av = a[i] - base[0];
         uint32_t bv = b[i] - base[1];
         uint32_t cv = c[i] - base[2];
         result[i] = (int16_t) (0.1*sqrt(av*av + bv*bv + cv*cv));
     }
-    //*/
-    /*
+    */
+    ///*
        __m512i _a, _a_off, _a_u, _a_l; // First index
        __m512i _b, _b_off, _b_u, _b_l; // Second index
        __m512i _c, _c_off, _c_u, _c_l; // Third index
@@ -211,7 +211,7 @@ static inline void find_32_distance_indices(
 
 
     //_mm512_storeu_epi32(result+16, _mm512_cvtps_epi32(_r_uf));// Store data in results
-    */
+    //*/
 }
 
 
@@ -334,9 +334,11 @@ int find_distrution_in_file(char* file_name) {
     long num_elem_w_full_blocks = num_elem - ELEM_IN_MEMORY;
     fclose(fp);
 
-#pragma omp parallel reduction(+:distribution[:DIST_SIZE])
+#pragma omp parallel
     {
 
+    uint64_t* l_distribution = (uint64_t*) calloc(DIST_SIZE, sizeof(uint64_t));
+    
     int16_t trip[3] = {0, 0, 0};
     int elements_to_process = 0;
     int end_of_file = 0;
@@ -360,7 +362,7 @@ int find_distrution_in_file(char* file_name) {
                 &end_of_file);
 
         find_distrution_from_data(
-                distribution, 
+                l_distribution, 
                 chunks_to_process,
                 elements_to_process-1,
                 trip);
@@ -373,7 +375,7 @@ int find_distrution_in_file(char* file_name) {
                     &end_of_file)) {
 
             find_distrution_from_data(
-                    distribution, 
+                    l_distribution, 
                     chunks_to_process,
                     elements_to_process,
                     trip);
@@ -397,7 +399,7 @@ int find_distrution_in_file(char* file_name) {
 #pragma omp for
     for(int ie = 0; ie < elements_to_process; ++ ie) {
         find_distrution_from_data_start(
-                distribution, 
+                l_distribution, 
                 chunks_to_process,
                 ie,
                 elements_to_process-1,
@@ -410,18 +412,27 @@ int find_distrution_in_file(char* file_name) {
         trip[2] = chunks_to_process[3*block + 2][loc];
     }
 
+    for(int i = 0; i < DIST_SIZE; ++i) {
+        //int tid = omp_get_thread_num();
+        //if(l_distribution[i] > 0)
+        //printf("(%d) [%i]: %d\n", tid, i, l_distribution[i]);
+#pragma omp atomic
+        distribution[i] += l_distribution[i];
+    }
+
+
     free(chunks_to_process);
     free(data_to_process);
-    
+    free(l_distribution);
     }
     
     for(int i = 0; i < DIST_SIZE; ++i) {
-        if(distribution[i] != 0) {
-            printf("%.2f %d\n", i / 100.f, distribution[i]);
-        }
+        if(distribution[i] != 0)
+        printf("%.2f %d\n", i / 100.f, distribution[i]); 
     }
     free(distribution);
 
+//    printf("%d\n", DIST_SIZE);
 
 
     return 0;

@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
             return -1;
         }
         t_index = 1;
-        file_name = "./data/cell";
+        file_name = "./cell";
     }
     else if(argc == 3)
     {
