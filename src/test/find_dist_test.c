@@ -74,7 +74,7 @@ void test_distance_index(int n_elements) {
     }
 
     //printf("CPB: %d", FLOATS_PER_CHUNK);
-    find_distrution_from_data(dist, data2, n_elements, ref);    
+    find_distrution_from_data(dist, data2, n_elements, ref, 0);    
 
     for(size_t i = 0; i < DIST_SIZE; ++i) {
         if(i == 173) {

@@ -47,7 +47,6 @@ int read_first_block_from_file(
             *end_of_file = 1;
             return 0;
         }
-        fseek(fp, -8, SEEK_CUR);
 
         //Load character data
         read = fread(char_data, sizeof(char), 8*floats_in_memory, fp);
@@ -70,7 +69,7 @@ int read_first_block_from_file(
         chunks[i % 3 + 3 * (i / 96)][(i / 3) % FLOATS_PER_CHUNK] = v;
     }
 
-    *elem_to_process = read / (8 * 3);
+    *elem_to_process = read / (8 * 3) - 1;
 
     free(char_data);
     return 1;
@@ -152,8 +151,6 @@ static inline void find_32_distance_indices(
        _b_off = _mm512_set1_epi16(base[1]); // a_off = the a coordinate of the other point
        _c_off = _mm512_set1_epi16(base[2]); // a_off = the a coordinate of the other point
 
-
-
        _a = _mm512_sub_epi16(_a, _a_off); // a = a - a_off
        _b = _mm512_sub_epi16(_b, _b_off); // a = a - a_off
        _c = _mm512_sub_epi16(_c, _c_off); // a = a - a_off
@@ -219,7 +216,8 @@ void find_distrution_from_data(
         uint64_t * distribution, 
         int16_t ** chunks_to_process,
         int end_elem,
-        int16_t* trip)
+        int16_t* trip,
+        int16_t p_off)
 {
     size_t end_block = end_elem / FLOATS_PER_CHUNK; 
     size_t ev = end_block;
@@ -236,7 +234,6 @@ void find_distrution_from_data(
 
     //printf("DISTZISE: %d\n", DIST_SIZE);
     for(int i_block = 0; i_block < ev; i_block++) {
-
         find_32_distance_indices(
                 indicies,
                 trip,
@@ -260,7 +257,6 @@ void find_distrution_from_data(
     for(int i = 0; i < rem; ++i){
         distribution[indicies[i]]++;
     }
-
 }
 
 
@@ -270,8 +266,10 @@ void find_distrution_from_data_start(
         int16_t ** chunks_to_process,
         int start_elem,
         int end_elem,
-        int16_t* trip)
+        int16_t* trip,
+        int16_t p_off)
 {
+
 
 
     size_t start_block = start_elem / FLOATS_PER_CHUNK;
@@ -312,6 +310,14 @@ void find_distrution_from_data_start(
 
             for(int i = start; i < end; ++i) {
                 distribution[indicies[i]]++;
+         /*       if(indicies[i] > 3000) {
+                    printf("%d | %5d - %5d | %5d - %5d | %5d - %5d = %5d | %2d\n", i + p_off,
+                            chunks_to_process[3*i_block][i], trip[0], 
+                            chunks_to_process[3*i_block+1][i], trip[1], 
+                            chunks_to_process[3*i_block+2][i], trip[2], 
+                            indicies[i], distribution[indicies[i]]
+                            );
+                }*/
             }
         }
 
@@ -331,108 +337,115 @@ int find_distrution_in_file(char* file_name) {
     FILE* fp = fopen(file_name, "r");
     fseek(fp,0L, SEEK_END);
     long num_elem = ftell(fp) / BYTES_PER_ELEM;
-    long num_elem_w_full_blocks = num_elem - ELEM_IN_MEMORY;
+    long num_elem_w_full_blocks = num_elem - floats_in_memory/8;
     fclose(fp);
 
 #pragma omp parallel
     {
 
-    uint64_t* l_distribution = (uint64_t*) calloc(DIST_SIZE, sizeof(uint64_t));
-    
-    int16_t trip[3] = {0, 0, 0};
-    int elements_to_process = 0;
-    int end_of_file = 0;
-    int16_t* data_to_process = (int16_t *) calloc(floats_in_memory, sizeof(int16_t));
 
-    int16_t** chunks_to_process = (int16_t **) calloc(floats_in_memory, sizeof(int16_t *));
-    for(int i = 0; i < floats_in_memory; ++i) {
-        chunks_to_process[i] = data_to_process + (i * FLOATS_PER_CHUNK);
-    }
-    
+        int16_t trip[3] = {0, 0, 0};
+        int elements_to_process = 0;
+        int end_of_file = 0;
+        int16_t* data_to_process = (int16_t *) calloc(floats_in_memory, sizeof(int16_t));
+
+        int16_t** chunks_to_process = (int16_t **) calloc(floats_in_memory, sizeof(int16_t *));
+        for(int i = 0; i < floats_in_memory; ++i) {
+            chunks_to_process[i] = data_to_process + (i * FLOATS_PER_CHUNK);
+        }
+
+        uint64_t* l_distribution = (uint64_t*) calloc(DIST_SIZE, sizeof(uint64_t));
+//#pragma omp single
+//        printf("(0)\n");
 
 #pragma omp for
-    for(int curr_elem = 0; curr_elem < num_elem_w_full_blocks; ++curr_elem) {
-        long int file_location = curr_elem * BYTES_PER_ELEM;
-        read_first_block_from_file(
-                file_name,
-                &file_location,
-                chunks_to_process,
-                trip,
-                &elements_to_process,
-                &end_of_file);
-
-        find_distrution_from_data(
-                l_distribution, 
-                chunks_to_process,
-                elements_to_process-1,
-                trip);
-
-        while(!end_of_file && read_block_from_file(
+        for(int curr_elem = 0; curr_elem < num_elem_w_full_blocks; ++curr_elem) {
+            long int file_location = curr_elem * BYTES_PER_ELEM;
+            read_first_block_from_file(
                     file_name,
                     &file_location,
                     chunks_to_process,
+                    trip,
                     &elements_to_process,
-                    &end_of_file)) {
+                    &end_of_file);
 
             find_distrution_from_data(
                     l_distribution, 
                     chunks_to_process,
                     elements_to_process,
-                    trip);
+                    trip, curr_elem+1);
+
+            int l_el = curr_elem;
+            while(!end_of_file && read_block_from_file(
+                        file_name,
+                        &file_location,
+                        chunks_to_process,
+                        &elements_to_process,
+                        &end_of_file)) {
+
+                find_distrution_from_data(
+                        l_distribution, 
+                        chunks_to_process,
+                        elements_to_process,
+                        trip, l_el);
+                l_el += elements_to_process;
+            }
         }
-    }
 
 
+            long int file_location = 0;
+            if(num_elem_w_full_blocks > 0)
+                file_location = num_elem_w_full_blocks * BYTES_PER_ELEM;
 
-#pragma single
-    {
-    long int file_location = num_elem_w_full_blocks * BYTES_PER_ELEM;
-    read_first_block_from_file(
-            file_name,
-            &file_location,
-            chunks_to_process,
-            trip,
-            &elements_to_process,
-            &end_of_file);
-    }
+#pragma omp single
+            read_block_from_file(
+                file_name,
+                &file_location,
+                chunks_to_process,
+                &elements_to_process,
+                &end_of_file);
+            if(!end_of_file) {
+                printf("ERROR; HASN'T REACHED EOF LOCATION: %\n", file_location);
+                exit(1);
+            }
 
 #pragma omp for
-    for(int ie = 0; ie < elements_to_process; ++ ie) {
-        find_distrution_from_data_start(
-                l_distribution, 
-                chunks_to_process,
-                ie,
-                elements_to_process-1,
-                trip);
+            for(int ie = 0; ie < elements_to_process; ++ie){
+                int block = ie / FLOATS_PER_CHUNK;
+                int loc = ie % FLOATS_PER_CHUNK;
 
-        int block = ie / FLOATS_PER_CHUNK;
-        int loc = ie % FLOATS_PER_CHUNK;
-        trip[0] = chunks_to_process[3*block][loc];
-        trip[1] = chunks_to_process[3*block + 1][loc];
-        trip[2] = chunks_to_process[3*block + 2][loc];
-    }
+                trip[0] = chunks_to_process[3*block][loc];
+                trip[1] = chunks_to_process[3*block + 1][loc];
+                trip[2] = chunks_to_process[3*block + 2][loc];
 
-    for(int i = 0; i < DIST_SIZE; ++i) {
-        //int tid = omp_get_thread_num();
-        //if(l_distribution[i] > 0)
-        //printf("(%d) [%i]: %d\n", tid, i, l_distribution[i]);
-#pragma omp atomic
-        distribution[i] += l_distribution[i];
-    }
+                find_distrution_from_data_start(
+                        l_distribution,
+                        chunks_to_process,
+                        ie+1,
+                        elements_to_process,
+                        trip,
+                        num_elem_w_full_blocks + ie
+                        );
+            }
 
-
-    free(chunks_to_process);
-    free(data_to_process);
-    free(l_distribution);
-    }
     
+#pragma omp critical
+        for(int d = 0; d < DIST_SIZE; ++d) {
+            distribution[d] += l_distribution[d];
+        }
+
+        free(chunks_to_process);
+        free(data_to_process);
+        free(l_distribution);
+    }
+
     for(int i = 0; i < DIST_SIZE; ++i) {
-        if(distribution[i] != 0)
-        printf("%05.2f %d\n", i / 100.f, distribution[i]); 
+        //if(distribution[i] != 0)
+            printf("%05.2f %d\n", i / 100.f, distribution[i]); 
     }
     free(distribution);
 
-//    printf("%d\n", DIST_SIZE);
+    //    printf("%d\n", DIST_SIZE);
 
 
     return 0;

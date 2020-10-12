@@ -34,14 +34,16 @@ void find_distrution_from_data(
         uint64_t * distribution, 
         int16_t ** chunks_to_process,
         int end_elem,
-        int16_t* trip);
+        int16_t* trip,
+        int16_t p_off);
 
 void find_distrution_from_data_start(
         uint64_t * distribution, 
         int16_t ** chunks_to_process,
         int start_elem,
         int end_elem,
-        int16_t* trip);
+        int16_t* trip,
+        int16_t p_off);
 #ifdef __cplusplus
 }
 #endif
