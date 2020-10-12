@@ -30,7 +30,7 @@ int read_first_block_from_file(
         int* end_of_file) {
 
     size_t read = 0;
-    char* char_data = (char *) malloc(8*floats_in_memory * sizeof(char));
+    char* char_data = (char *) malloc((8*floats_in_memory+24) * sizeof(char));
 //#pragma critical
  //   {
         FILE *fp = fopen(file_name, "r");
@@ -44,17 +44,19 @@ int read_first_block_from_file(
         // Set location place
         fseek(fp, *file_location, SEEK_SET);
         if(feof(fp)) {
+            printf("END");
             *end_of_file = 1;
-            return 0;
+            return ftell(fp);
         }
 
         //Load character data
-#pragma omp critical
+//#pragma omp critical
         read = fread(char_data, sizeof(char), 8*floats_in_memory+24, fp);
 
         *file_location = ftell(fp);
+        //printf("END %d\n", file_location);
         if(feof(fp)) {
-            *end_of_file = 1;
+            *end_of_file = ftell(fp);
         }
         fclose(fp);
 
@@ -64,14 +66,15 @@ int read_first_block_from_file(
     first[1] = getInt(char_data + 8);
     first[2] = getInt(char_data + 16);
 
-
-    int endValue = read/8-1;
-    for(size_t i = 1; i < (read / 8); ++i) {
-        int v = getInt(char_data + 8 * i + 24);
-        chunks[i % 3 + 3 * (i / 96)][(i / 3) % FLOATS_PER_CHUNK] = v;
+    *elem_to_process = (read - 24)/ (8 * 3);
+    for(size_t i = 0; i < *elem_to_process; ++i) {
+//        printf("i %i\n",i);
+        int block = 3*(i / FLOATS_PER_CHUNK);
+        int loc = i % FLOATS_PER_CHUNK;
+        chunks[block][loc] = getInt(char_data + 24*i + 24);
+        chunks[block +1][loc] = getInt(char_data + 24*i + 8 + 24);
+        chunks[block + 2][loc] = getInt(char_data + 24*i + 16 + 24);
     }
-
-    *elem_to_process = read / (8 * 3) - 1;
 
     free(char_data);
     return 1;
@@ -114,12 +117,16 @@ int read_block_from_file(
 //    }//End Critical
 
 
-    for(size_t i = 0; i < (read / 8); ++i) {
-        int v = getInt(char_data + 8 * i);
-        chunks[i % 3 + 3 * (i / 96)][(i / 3) % FLOATS_PER_CHUNK] = v;
+    *elem_to_process = read / (8 * 3);
+    for(size_t i = 0; i < *elem_to_process; ++i) {
+//        printf("i %i\n",i);
+        int block = 3*(i / FLOATS_PER_CHUNK);
+        int loc = i % FLOATS_PER_CHUNK;
+        chunks[block][loc] = getInt(char_data + 24*i);
+        chunks[block +1][loc] = getInt(char_data + 24*i + 8);
+        chunks[block + 2][loc] = getInt(char_data + 24*i + 16);
     }
 
-    *elem_to_process = read / (8 * 3);
     free(char_data);
     return 1;
 }
@@ -338,7 +345,7 @@ int find_distrution_in_file(char* file_name) {
     FILE* fp = fopen(file_name, "r");
     fseek(fp,0L, SEEK_END);
     long num_elem = ftell(fp) / BYTES_PER_ELEM;
-    long num_elem_w_full_blocks = num_elem - floats_in_memory/8;
+    long num_elem_w_full_blocks = num_elem - floats_in_memory/3 + 1000;
     fclose(fp);
 
 #pragma omp parallel
@@ -398,15 +405,15 @@ int find_distrution_in_file(char* file_name) {
             if(num_elem_w_full_blocks > 0)
                 file_location = num_elem_w_full_blocks * BYTES_PER_ELEM;
 
-#pragma omp single
-            read_block_from_file(
+//#pragma omp single
+            if(!read_block_from_file(
                 file_name,
                 &file_location,
                 chunks_to_process,
                 &elements_to_process,
-                &end_of_file);
-            if(!end_of_file) {
-                printf("ERROR; HASN'T REACHED EOF LOCATION: %\n", file_location);
+                &end_of_file))
+            {
+                printf("ERROR; HASN'T REACHED EOF LOCATION: %d %d\n", file_location, end_of_file);
                 exit(1);
             }
 
@@ -441,7 +448,7 @@ int find_distrution_in_file(char* file_name) {
     }
 
     for(int i = 0; i < DIST_SIZE; ++i) {
-        //if(distribution[i] != 0)
+        if(distribution[i] != 0)
             printf("%05.2f %d\n", i / 100.f, distribution[i]); 
     }
     free(distribution);
