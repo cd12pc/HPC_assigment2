@@ -30,9 +30,9 @@ int read_first_block_from_file(
         int* end_of_file) {
 
     size_t read = 0;
-    char* char_data = (char *) calloc(8*floats_in_memory, sizeof(char));
-#pragma critical
-    {
+    char* char_data = (char *) malloc(8*floats_in_memory * sizeof(char));
+//#pragma critical
+ //   {
         FILE *fp = fopen(file_name, "r");
         if (fp == NULL) {
             printf("Error opening file (%s)\n", fp);
@@ -49,7 +49,8 @@ int read_first_block_from_file(
         }
 
         //Load character data
-        read = fread(char_data, sizeof(char), 8*floats_in_memory, fp);
+#pragma omp critical
+        read = fread(char_data, sizeof(char), 8*floats_in_memory+24, fp);
 
         *file_location = ftell(fp);
         if(feof(fp)) {
@@ -57,14 +58,15 @@ int read_first_block_from_file(
         }
         fclose(fp);
 
-    } //End critical
+//    } //End critical
 
     first[0] = getInt(char_data);
     first[1] = getInt(char_data + 8);
     first[2] = getInt(char_data + 16);
 
+
     int endValue = read/8-1;
-    for(size_t i = 0; i < (read / 8) - 1; ++i) {
+    for(size_t i = 1; i < (read / 8); ++i) {
         int v = getInt(char_data + 8 * i + 24);
         chunks[i % 3 + 3 * (i / 96)][(i / 3) % FLOATS_PER_CHUNK] = v;
     }
@@ -82,10 +84,10 @@ int read_block_from_file(
         int* elem_to_process, 
         int* end_of_file) {
 
-    char* char_data = (char *) calloc(8*floats_in_memory, sizeof(char));
+    char* char_data = (char *) malloc(8*floats_in_memory * sizeof(char));
     size_t read = 0;
-#pragma critical
-    {
+//#pragma critical
+//    {
 
         FILE *fp = fopen(file_name, "r");
         if (fp == NULL) {
@@ -109,7 +111,7 @@ int read_block_from_file(
         }
         *file_location = ftell(fp);
         fclose(fp);
-    }//End Critical
+//    }//End Critical
 
 
     for(size_t i = 0; i < (read / 8); ++i) {
@@ -128,15 +130,14 @@ static inline void find_32_distance_indices(
         int16_t * result, 
         int16_t* base, 
         int16_t* a, int16_t * b, int16_t* c) {
-    /*
+#if defined(DEBUG) || defined(PROF)
     for(int i = 0; i < 32; ++i) {
         uint32_t av = a[i] - base[0];
         uint32_t bv = b[i] - base[1];
         uint32_t cv = c[i] - base[2];
         result[i] = (int16_t) (0.1*sqrt(av*av + bv*bv + cv*cv));
     }
-    */
-    ///*
+#else
        __m512i _a, _a_off, _a_u, _a_l; // First index
        __m512i _b, _b_off, _b_u, _b_l; // Second index
        __m512i _c, _c_off, _c_u, _c_l; // Third index
@@ -206,7 +207,7 @@ static inline void find_32_distance_indices(
     //    _§mm512_set1_ps(PRECISION), 
     //    _MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC );
 
-
+#endif
     //_mm512_storeu_epi32(result+16, _mm512_cvtps_epi32(_r_uf));// Store data in results
     //*/
 }
